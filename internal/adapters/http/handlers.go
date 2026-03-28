@@ -16,6 +16,7 @@ import (
 
 type Handler struct {
 	ingest           *application.IngestCoverageRunUseCase
+	listProjects     *application.ListProjectsUseCase
 	getProject       *application.GetProjectUseCase
 	listRuns         *application.ListCoverageRunsUseCase
 	latestComparison *application.GetLatestComparisonUseCase
@@ -23,12 +24,14 @@ type Handler struct {
 
 func NewHandler(
 	ingest *application.IngestCoverageRunUseCase,
+	listProjects *application.ListProjectsUseCase,
 	getProject *application.GetProjectUseCase,
 	listRuns *application.ListCoverageRunsUseCase,
 	latestComparison *application.GetLatestComparisonUseCase,
 ) *Handler {
 	return &Handler{
 		ingest:           ingest,
+		listProjects:     listProjects,
 		getProject:       getProject,
 		listRuns:         listRuns,
 		latestComparison: latestComparison,
@@ -92,6 +95,20 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("operation", "name", "get_project", "stage", "success", "request_id", requestID, "project_id", projectID, "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	slog.Info("operation", "name", "list_projects", "stage", "start", "request_id", requestID)
+	out, err := h.listProjects.Execute(r.Context())
+	if err != nil {
+		slog.Error("operation", "name", "list_projects", "stage", "execute_failed", "request_id", requestID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+	slog.Info("operation", "name", "list_projects", "stage", "success", "request_id", requestID, "items", len(out.Items), "duration_ms", time.Since(start).Milliseconds())
 	writeJSON(w, http.StatusOK, out)
 }
 

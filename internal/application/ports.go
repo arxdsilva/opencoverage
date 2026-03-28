@@ -10,6 +10,7 @@ import (
 type ProjectRepository interface {
 	GetByKey(ctx context.Context, projectKey string) (domain.Project, error)
 	GetByID(ctx context.Context, projectID string) (domain.Project, error)
+	List(ctx context.Context) ([]domain.Project, error)
 	Create(ctx context.Context, project domain.Project) (domain.Project, error)
 }
 

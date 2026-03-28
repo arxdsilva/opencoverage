@@ -11,8 +11,20 @@ type GetProjectUseCase struct {
 	projects ProjectRepository
 }
 
+type ListProjectsOutput struct {
+	Items []ProjectResponse `json:"items"`
+}
+
+type ListProjectsUseCase struct {
+	projects ProjectRepository
+}
+
 func NewGetProjectUseCase(projects ProjectRepository) *GetProjectUseCase {
 	return &GetProjectUseCase{projects: projects}
+}
+
+func NewListProjectsUseCase(projects ProjectRepository) *ListProjectsUseCase {
+	return &ListProjectsUseCase{projects: projects}
 }
 
 func (uc *GetProjectUseCase) Execute(ctx context.Context, projectID string) (ProjectResponse, error) {
@@ -32,4 +44,25 @@ func (uc *GetProjectUseCase) Execute(ctx context.Context, projectID string) (Pro
 		GlobalThresholdPercent: project.GlobalThresholdPercent,
 		Created:                false,
 	}, nil
+}
+
+func (uc *ListProjectsUseCase) Execute(ctx context.Context) (ListProjectsOutput, error) {
+	projects, err := uc.projects.List(ctx)
+	if err != nil {
+		return ListProjectsOutput{}, NewInternal("failed to list projects", err)
+	}
+
+	items := make([]ProjectResponse, 0, len(projects))
+	for _, project := range projects {
+		items = append(items, ProjectResponse{
+			ID:                     project.ID,
+			ProjectKey:             project.ProjectKey,
+			Name:                   project.Name,
+			DefaultBranch:          project.DefaultBranch,
+			GlobalThresholdPercent: project.GlobalThresholdPercent,
+			Created:                false,
+		})
+	}
+
+	return ListProjectsOutput{Items: items}, nil
 }

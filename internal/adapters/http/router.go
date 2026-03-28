@@ -26,6 +26,7 @@ func NewRouter(handler *Handler, auth application.APIKeyAuthenticator, apiKeyHea
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(APIKeyMiddleware(auth, apiKeyHeader))
 
+		v1.Get("/projects", handler.ListProjects)
 		v1.Post("/coverage-runs", handler.IngestCoverageRun)
 		v1.Get("/projects/{projectId}", handler.GetProject)
 		v1.Get("/projects/{projectId}/coverage-runs", handler.ListCoverageRuns)

@@ -66,6 +66,7 @@ make migrate-create name=add_new_table
 
 Main endpoints:
 
+- `GET /v1/projects`
 - `POST /v1/coverage-runs`
 - `GET /v1/projects/{projectId}`
 - `GET /v1/projects/{projectId}/coverage-runs`
@@ -131,4 +132,73 @@ Get latest comparison:
 ```bash
 curl -i "$BASE_URL/v1/projects/$PROJECT_ID/coverage-runs/latest-comparison" \
 	-H "X-API-Key: $API_KEY"
+```
+
+## Coverage CLI Workflow
+
+Install the CLI from GitHub:
+
+```bash
+go install github.com/arxdsilva/coverage-api/cmd/coveragecli@latest
+```
+
+CI-friendly (pin to a specific ref/tag/commit):
+
+```bash
+go install github.com/arxdsilva/coverage-api/cmd/coveragecli@v1.0.0
+# or
+go install github.com/arxdsilva/coverage-api/cmd/coveragecli@<git-sha>
+```
+
+GitHub Actions step example:
+
+```yaml
+- name: Install coverage CLI
+	run: go install github.com/arxdsilva/coverage-api/cmd/coveragecli@latest
+
+- name: Upload coverage to API
+	env:
+		API_KEY: ${{ secrets.COVERAGE_API_KEY }}
+	run: |
+		go test ./... -coverprofile=coverage.out
+		coveragecli \
+			-coverprofile coverage.out \
+			-out coverage-upload.json \
+			-api-url https://your-api.example.com/v1/coverage-runs \
+			-api-key "$API_KEY" \
+			-project-key github.com/your-org/your-repo \
+			-project-name your-repo \
+			-branch "$GITHUB_REF_NAME" \
+			-commit-sha "$GITHUB_SHA" \
+			-author "github-actions" \
+			-trigger-type push \
+			-upload
+```
+
+Generate Go coverage profile and API payload file:
+
+```bash
+make coverage-file
+```
+
+This creates:
+
+- `coverage.out` (Go cover profile)
+- `coverage-upload.json` (API-ready JSON payload)
+
+Generate and upload in one step:
+
+```bash
+make coverage-upload API_URL="http://localhost:8080/v1/coverage-runs" API_KEY="dev-local-key"
+```
+
+Sample command to send an existing payload file from Go CLI to the API:
+
+```bash
+go run ./cmd/coveragecli \
+	-coverprofile coverage.out \
+	-out coverage-upload.json \
+	-api-url http://localhost:8080/v1/coverage-runs \
+	-api-key dev-local-key \
+	-upload
 ```

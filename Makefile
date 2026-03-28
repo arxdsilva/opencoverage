@@ -15,6 +15,14 @@ COMPOSE_DATABASE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@db:5432/$(DB_NAME)?
 .PHONY: compose-up compose-down compose-logs compose-ps
 .PHONY: migrate-up migrate-down migrate-status migrate-reset migrate-create
 .PHONY: migrate-up-docker migrate-down-docker
+.PHONY: coverage-file coverage-upload
+
+COVERAGE_PROFILE ?= coverage.out
+COVERAGE_PAYLOAD ?= coverage-upload.json
+API_URL ?= http://localhost:8080/v1/coverage-runs
+API_KEY ?= dev-local-key
+COVERAGE_PROJECT_KEY ?= github.com/arxdsilva/coverage-api
+COVERAGE_PROJECT_NAME ?= coverage-api
 
 help:
 	@echo "Available targets:"
@@ -34,6 +42,8 @@ help:
 	@echo "  make migrate-create name=<migration_name> - Create new SQL migration"
 	@echo "  make migrate-up-docker  - Run migrations against compose DB"
 	@echo "  make migrate-down-docker - Roll back one migration against compose DB"
+	@echo "  make coverage-file      - Generate coverage.out and API payload JSON file"
+	@echo "  make coverage-upload    - Generate + upload coverage payload to running API"
 
 deps:
 	go mod tidy
@@ -80,3 +90,22 @@ migrate-up-docker:
 
 migrate-down-docker:
 	$(COMPOSE) run --rm migrate down
+
+coverage-file:
+	go test ./... -coverprofile=$(COVERAGE_PROFILE)
+	go run ./cmd/coveragecli \
+		-coverprofile $(COVERAGE_PROFILE) \
+		-out $(COVERAGE_PAYLOAD) \
+		-project-key $(COVERAGE_PROJECT_KEY) \
+		-project-name $(COVERAGE_PROJECT_NAME)
+
+coverage-upload:
+	go test ./... -coverprofile=$(COVERAGE_PROFILE)
+	go run ./cmd/coveragecli \
+		-coverprofile $(COVERAGE_PROFILE) \
+		-out $(COVERAGE_PAYLOAD) \
+		-project-key $(COVERAGE_PROJECT_KEY) \
+		-project-name $(COVERAGE_PROJECT_NAME) \
+		-api-url $(API_URL) \
+		-api-key $(API_KEY) \
+		-upload

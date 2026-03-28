@@ -57,11 +57,12 @@ func main() {
 	idGenerator := idgen.NewUUIDGenerator()
 
 	ingestUC := application.NewIngestCoverageRunUseCase(projectRepo, runRepo, packageRepo, txManager, idGenerator, clockAdapter)
+	listProjectsUC := application.NewListProjectsUseCase(projectRepo)
 	getProjectUC := application.NewGetProjectUseCase(projectRepo)
 	listRunsUC := application.NewListCoverageRunsUseCase(runRepo)
 	latestComparisonUC := application.NewGetLatestComparisonUseCase(projectRepo, runRepo, packageRepo)
 
-	handler := httpadapter.NewHandler(ingestUC, getProjectUC, listRunsUC, latestComparisonUC)
+	handler := httpadapter.NewHandler(ingestUC, listProjectsUC, getProjectUC, listRunsUC, latestComparisonUC)
 	router := httpadapter.NewRouter(handler, authenticator, cfg.APIKeyHeader)
 
 	server := &http.Server{

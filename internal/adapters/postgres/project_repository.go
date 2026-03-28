@@ -88,3 +88,39 @@ func (r *ProjectRepository) Create(ctx context.Context, project domain.Project) 
 	}
 	return project, nil
 }
+
+func (r *ProjectRepository) List(ctx context.Context) ([]domain.Project, error) {
+	q := getQuerier(ctx, r.pool)
+	rows, err := q.Query(ctx, `
+		SELECT id, project_key, COALESCE(name, ''), default_branch, global_threshold_percent, created_at, updated_at
+		FROM projects
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	defer rows.Close()
+
+	projects := make([]domain.Project, 0)
+	for rows.Next() {
+		var p domain.Project
+		if err := rows.Scan(
+			&p.ID,
+			&p.ProjectKey,
+			&p.Name,
+			&p.DefaultBranch,
+			&p.GlobalThresholdPercent,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan project: %w", err)
+		}
+		projects = append(projects, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate projects: %w", err)
+	}
+
+	return projects, nil
+}
