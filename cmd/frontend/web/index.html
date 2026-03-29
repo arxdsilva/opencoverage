@@ -17,6 +17,7 @@
           <p class="eyebrow">Coverage API</p>
           <h1>Projects</h1>
           <button id="refreshProjects" class="btn">Refresh</button>
+          <button id="openHeatmap" class="btn">Open Heatmap</button>
         </div>
         <ul id="projectList" class="project-list"></ul>
       </aside>
@@ -40,6 +41,10 @@
           <article class="card stat">
             <p class="label">Delta</p>
             <p id="deltaCoverage" class="value">-</p>
+          </article>
+          <article class="card stat">
+            <p class="label">Threshold</p>
+            <p id="thresholdPercent" class="value">-</p>
           </article>
           <article class="card stat">
             <p class="label">Threshold Status</p>
@@ -86,6 +91,19 @@
                 <tbody id="runsBody"></tbody>
               </table>
             </div>
+          </article>
+        </section>
+
+        <section id="heatmapOverlay" class="heatmap-overlay" aria-hidden="true">
+          <article class="card heatmap-card heatmap-overlay-card">
+            <div class="heatmap-overlay-head">
+              <div class="table-head heatmap-head">
+                <h3>Projects Heatmap</h3>
+                <p class="muted">All projects. Red = down/below threshold. Green = up/equal or threshold passed.</p>
+              </div>
+              <button id="closeHeatmap" class="btn">Close</button>
+            </div>
+            <div id="heatmapGrid" class="heatmap-grid heatmap-overlay-grid"></div>
           </article>
         </section>
       </section>
