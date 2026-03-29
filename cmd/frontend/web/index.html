@@ -59,6 +59,38 @@
           </article>
         </section>
 
+        <section class="context-grid">
+          <article class="card branch-selector-card">
+            <div class="branch-selector-head">
+              <p class="eyebrow">Select Branch for Comparison</p>
+            </div>
+            <select id="branchSelector" class="branch-select">
+              <option value="">Loading branches...</option>
+            </select>
+          </article>
+
+          <article id="compareCard" class="card compare-card">
+            <div class="compare-head">
+              <p class="eyebrow">Branch Comparison</p>
+              <p id="compareSummary" class="compare-summary">Waiting for comparison data...</p>
+            </div>
+            <div class="compare-meta">
+              <div class="compare-item">
+                <span class="label">Current Run</span>
+                <span id="compareCurrent" class="chip">-</span>
+              </div>
+              <div class="compare-item">
+                <span class="label">Compared Against</span>
+                <span id="compareBaseline" class="chip">-</span>
+              </div>
+              <div class="compare-item">
+                <span class="label">Run Type</span>
+                <span id="compareRunType" class="chip">-</span>
+              </div>
+            </div>
+          </article>
+        </section>
+
         <section class="tables-grid">
           <article class="card table-card">
             <div class="table-head">

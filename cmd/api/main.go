@@ -61,8 +61,9 @@ func main() {
 	getProjectUC := application.NewGetProjectUseCase(projectRepo)
 	listRunsUC := application.NewListCoverageRunsUseCase(runRepo)
 	latestComparisonUC := application.NewGetLatestComparisonUseCase(projectRepo, runRepo, packageRepo)
+	listBranchesUC := application.NewListBranchesUseCase(runRepo)
 
-	handler := httpadapter.NewHandler(ingestUC, listProjectsUC, getProjectUC, listRunsUC, latestComparisonUC)
+	handler := httpadapter.NewHandler(ingestUC, listProjectsUC, getProjectUC, listRunsUC, latestComparisonUC, listBranchesUC)
 	router := httpadapter.NewRouter(handler, authenticator, cfg.APIKeyHeader)
 
 	server := &http.Server{

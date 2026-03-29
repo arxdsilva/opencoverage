@@ -182,3 +182,31 @@ func (r *CoverageRunRepository) ListByProject(
 
 	return runs, total, nil
 }
+
+func (r *CoverageRunRepository) ListBranchesByProject(ctx context.Context, projectID string) ([]string, error) {
+	q := getQuerier(ctx, r.pool)
+	rows, err := q.Query(ctx, `
+		SELECT DISTINCT branch FROM coverage_runs
+		WHERE project_id = $1
+		ORDER BY branch ASC
+	`, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("query branches: %w", err)
+	}
+	defer rows.Close()
+
+	var branches []string
+	for rows.Next() {
+		var branch string
+		if err := rows.Scan(&branch); err != nil {
+			return nil, fmt.Errorf("scan branch: %w", err)
+		}
+		branches = append(branches, branch)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate branch rows: %w", err)
+	}
+
+	return branches, nil
+}

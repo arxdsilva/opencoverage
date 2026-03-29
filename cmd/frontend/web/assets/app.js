@@ -17,10 +17,18 @@ const projectPagination = document.getElementById('projectPagination');
 const projectPrev = document.getElementById('projectPrev');
 const projectNext = document.getElementById('projectNext');
 const projectPageInfo = document.getElementById('projectPageInfo');
+const compareCard = document.getElementById('compareCard');
+const compareSummary = document.getElementById('compareSummary');
+const compareCurrent = document.getElementById('compareCurrent');
+const compareBaseline = document.getElementById('compareBaseline');
+const compareRunType = document.getElementById('compareRunType');
+const branchSelector = document.getElementById('branchSelector');
 
 let projects = [];
 let allProjects = [];
 let selectedProjectId = null;
+let selectedBranch = '';
+let availableBranches = [];
 let heatmapItems = [];
 const projectsPerPage = 7;
 let projectPage = 1;
@@ -35,6 +43,10 @@ openHeatmap.addEventListener('click', () => {
 closeHeatmap.addEventListener('click', () => toggleHeatmapOverlay(false));
 projectPrev.addEventListener('click', async () => changeProjectPage(-1));
 projectNext.addEventListener('click', async () => changeProjectPage(1));
+branchSelector.addEventListener('change', async (e) => {
+  selectedBranch = e.target.value;
+  await loadLatestComparison(selectedProjectId);
+});
 
 async function changeProjectPage(offset) {
   const target = Math.max(1, Math.min(projectTotalPages, projectPage + offset));
@@ -123,6 +135,7 @@ function renderProjectList() {
 
 async function selectProject(projectId) {
   selectedProjectId = projectId;
+  selectedBranch = '';
   renderProjectList();
   renderHeatmap();
 
@@ -130,7 +143,8 @@ async function selectProject(projectId) {
   selectedProjectName.textContent = project?.name || project?.projectKey || 'Project';
   selectedProjectMeta.textContent = `${project?.projectKey || ''} - default branch: ${project?.defaultBranch || 'main'} - threshold: ${pct(project?.globalThresholdPercent)}`;
 
-  await Promise.all([loadLatestComparison(projectId), loadRecentRuns(projectId)]);
+  await Promise.all([loadBranches(projectId), loadRecentRuns(projectId)]);
+  await loadLatestComparison(projectId);
 }
 
 async function loadHeatmap() {
@@ -229,10 +243,47 @@ function tileSizeForCoverage(current) {
   return { col: 3, row: 2 };
 }
 
+async function loadBranches(projectId) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/branches`);
+    if (!res.ok) throw new Error(`failed to load branches (${res.status})`);
+    const data = await res.json();
+    availableBranches = data.branches || [];
+    renderBranchSelector();
+  } catch (err) {
+    console.error('Error loading branches:', err);
+    branchSelector.innerHTML = '<option value="">Error loading branches</option>';
+  }
+}
+
+function renderBranchSelector() {
+  branchSelector.innerHTML = '';
+  
+  // Add empty option for latest run
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = 'Latest Run (All Branches)';
+  branchSelector.appendChild(emptyOption);
+  
+  // Add each branch as an option
+  for (const branch of availableBranches) {
+    const option = document.createElement('option');
+    option.value = branch;
+    option.textContent = branch;
+    branchSelector.appendChild(option);
+  }
+  
+  branchSelector.value = selectedBranch;
+}
+
 async function loadLatestComparison(projectId) {
   packagesBody.innerHTML = '';
   try {
-    const res = await fetch(`/api/projects/${projectId}/coverage-runs/latest-comparison`);
+    const url = new URL(`/api/projects/${projectId}/coverage-runs/latest-comparison`, window.location.origin);
+    if (selectedBranch) {
+      url.searchParams.set('branch', selectedBranch);
+    }
+    const res = await fetch(url.toString());
     if (!res.ok) throw new Error(`failed to load latest comparison (${res.status})`);
     const data = await res.json();
 
@@ -243,6 +294,21 @@ async function loadLatestComparison(projectId) {
 
     thresholdStatus.textContent = data.comparison.thresholdStatus || '-';
     thresholdStatus.className = `value ${data.comparison.thresholdStatus === 'passed' ? 'passed' : 'failed'}`;
+
+    const project = projects.find((p) => p.id === projectId) || allProjects.find((p) => p.id === projectId);
+    const defaultBranch = project?.defaultBranch || 'main';
+    const runBranch = data.run?.branch || '-';
+    const runType = data.run?.triggerType || 'unknown';
+    const baselineSource = data.comparison?.baselineSource || 'latest_default_branch';
+    const isPRComparison = runType === 'pr' && runBranch !== defaultBranch;
+
+    compareSummary.textContent = isPRComparison
+      ? `PR branch ${runBranch} is being compared against default branch ${defaultBranch}.`
+      : `Latest ${runType.toUpperCase()} run on ${runBranch} is compared against default branch ${defaultBranch}.`;
+    compareCurrent.textContent = runBranch;
+    compareBaseline.textContent = `${defaultBranch} (${baselineSource})`;
+    compareRunType.textContent = runType.toUpperCase();
+    compareCard.classList.toggle('pr-mode', isPRComparison);
 
     for (const p of data.packages || []) {
       const tr = document.createElement('tr');
@@ -262,6 +328,11 @@ async function loadLatestComparison(projectId) {
     thresholdPercent.textContent = '-';
     thresholdStatus.textContent = 'error';
     thresholdStatus.className = 'value failed';
+    compareSummary.textContent = err.message;
+    compareCurrent.textContent = '-';
+    compareBaseline.textContent = '-';
+    compareRunType.textContent = '-';
+    compareCard.classList.remove('pr-mode');
 
     const tr = document.createElement('tr');
     tr.innerHTML = `<td colspan="5" class="muted">${err.message}</td>`;

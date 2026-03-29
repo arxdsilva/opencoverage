@@ -20,6 +20,7 @@ type Handler struct {
 	getProject       *application.GetProjectUseCase
 	listRuns         *application.ListCoverageRunsUseCase
 	latestComparison *application.GetLatestComparisonUseCase
+	listBranches     *application.ListBranchesUseCase
 }
 
 func NewHandler(
@@ -28,6 +29,7 @@ func NewHandler(
 	getProject *application.GetProjectUseCase,
 	listRuns *application.ListCoverageRunsUseCase,
 	latestComparison *application.GetLatestComparisonUseCase,
+	listBranches *application.ListBranchesUseCase,
 ) *Handler {
 	return &Handler{
 		ingest:           ingest,
@@ -35,6 +37,7 @@ func NewHandler(
 		getProject:       getProject,
 		listRuns:         listRuns,
 		latestComparison: latestComparison,
+		listBranches:     listBranches,
 	}
 }
 
@@ -170,14 +173,33 @@ func (h *Handler) GetLatestComparison(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	requestID := chiMiddleware.GetReqID(r.Context())
 	projectID := chi.URLParam(r, "projectId")
-	slog.Info("operation", "name", "get_latest_comparison", "stage", "start", "request_id", requestID, "project_id", projectID)
-	out, err := h.latestComparison.Execute(r.Context(), projectID)
+	branch := r.URL.Query().Get("branch")
+	slog.Info("operation", "name", "get_latest_comparison", "stage", "start", "request_id", requestID, "project_id", projectID, "branch", branch)
+	out, err := h.latestComparison.Execute(r.Context(), application.GetLatestComparisonInput{
+		ProjectID: projectID,
+		Branch:    branch,
+	})
 	if err != nil {
-		slog.Error("operation", "name", "get_latest_comparison", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "error", err)
+		slog.Error("operation", "name", "get_latest_comparison", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "branch", branch, "error", err)
 		writeAppError(w, err)
 		return
 	}
-	slog.Info("operation", "name", "get_latest_comparison", "stage", "success", "request_id", requestID, "project_id", projectID, "run_id", out.Run.ID, "duration_ms", time.Since(start).Milliseconds())
+	slog.Info("operation", "name", "get_latest_comparison", "stage", "success", "request_id", requestID, "project_id", projectID, "branch", branch, "run_id", out.Run.ID, "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) ListBranches(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	projectID := chi.URLParam(r, "projectId")
+	slog.Info("operation", "name", "list_branches", "stage", "start", "request_id", requestID, "project_id", projectID)
+	out, err := h.listBranches.Execute(r.Context(), projectID)
+	if err != nil {
+		slog.Error("operation", "name", "list_branches", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+	slog.Info("operation", "name", "list_branches", "stage", "success", "request_id", requestID, "project_id", projectID, "count", len(out.Branches), "duration_ms", time.Since(start).Milliseconds())
 	writeJSON(w, http.StatusOK, out)
 }
 

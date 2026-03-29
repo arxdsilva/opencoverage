@@ -27,6 +27,7 @@ type CoverageRunRepository interface {
 		page int,
 		pageSize int,
 	) ([]domain.CoverageRun, int, error)
+	ListBranchesByProject(ctx context.Context, projectID string) ([]string, error)
 }
 
 type PackageCoverageRepository interface {

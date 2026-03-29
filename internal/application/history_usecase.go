@@ -90,6 +90,11 @@ func (uc *ListCoverageRunsUseCase) Execute(ctx context.Context, in ListCoverageR
 	}, nil
 }
 
+type GetLatestComparisonInput struct {
+	ProjectID string
+	Branch    string // optional; if empty, uses latest run across all branches
+}
+
 type LatestComparisonOutput struct {
 	Run        RunResponse                 `json:"run"`
 	Comparison ComparisonResponse          `json:"comparison"`
@@ -110,19 +115,24 @@ func NewGetLatestComparisonUseCase(
 	return &GetLatestComparisonUseCase{projects: projects, runs: runs, packages: packages}
 }
 
-func (uc *GetLatestComparisonUseCase) Execute(ctx context.Context, projectID string) (LatestComparisonOutput, error) {
-	project, err := uc.projects.GetByID(ctx, projectID)
+func (uc *GetLatestComparisonUseCase) Execute(ctx context.Context, in GetLatestComparisonInput) (LatestComparisonOutput, error) {
+	project, err := uc.projects.GetByID(ctx, in.ProjectID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return LatestComparisonOutput{}, NewNotFound("project not found", map[string]any{"projectId": projectID})
+			return LatestComparisonOutput{}, NewNotFound("project not found", map[string]any{"projectId": in.ProjectID})
 		}
 		return LatestComparisonOutput{}, NewInternal("failed to load project", err)
 	}
 
-	run, err := uc.runs.GetLatestByProject(ctx, projectID)
+	var run domain.CoverageRun
+	if in.Branch != "" {
+		run, err = uc.runs.GetLatestByProjectAndBranch(ctx, in.ProjectID, in.Branch)
+	} else {
+		run, err = uc.runs.GetLatestByProject(ctx, in.ProjectID)
+	}
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return LatestComparisonOutput{}, NewNotFound("no coverage runs found", map[string]any{"projectId": projectID})
+			return LatestComparisonOutput{}, NewNotFound("no coverage runs found", map[string]any{"projectId": in.ProjectID, "branch": in.Branch})
 		}
 		return LatestComparisonOutput{}, NewInternal("failed to load latest run", err)
 	}
@@ -132,7 +142,7 @@ func (uc *GetLatestComparisonUseCase) Execute(ctx context.Context, projectID str
 		return LatestComparisonOutput{}, NewInternal("failed to load package coverage", err)
 	}
 
-	baselineRun, err := uc.runs.GetLatestByProjectAndBranch(ctx, projectID, project.DefaultBranch)
+	baselineRun, err := uc.runs.GetLatestByProjectAndBranch(ctx, in.ProjectID, project.DefaultBranch)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return LatestComparisonOutput{}, NewInternal("failed to load baseline run", err)
 	}
@@ -162,5 +172,28 @@ func (uc *GetLatestComparisonUseCase) Execute(ctx context.Context, projectID str
 		},
 		Comparison: buildComparison(run.TotalCoveragePercent, previousTotal, project.GlobalThresholdPercent),
 		Packages:   buildPackageComparisons(currentPackages, baselinePackages),
+	}, nil
+}
+
+type ListBranchesOutput struct {
+	Branches []string `json:"branches"`
+}
+
+type ListBranchesUseCase struct {
+	runs CoverageRunRepository
+}
+
+func NewListBranchesUseCase(runs CoverageRunRepository) *ListBranchesUseCase {
+	return &ListBranchesUseCase{runs: runs}
+}
+
+func (uc *ListBranchesUseCase) Execute(ctx context.Context, projectID string) (ListBranchesOutput, error) {
+	branches, err := uc.runs.ListBranchesByProject(ctx, projectID)
+	if err != nil {
+		return ListBranchesOutput{}, NewInternal("failed to list branches", err)
+	}
+
+	return ListBranchesOutput{
+		Branches: branches,
 	}, nil
 }
