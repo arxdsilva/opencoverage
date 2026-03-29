@@ -60,16 +60,21 @@ body {
 .sidebar {
   padding: 16px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .sidebar-header {
   display: grid;
   gap: 8px;
-  margin-bottom: 14px;
+}
+
+.project-list-wrap {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .eyebrow {
@@ -108,6 +113,22 @@ h3 {
   grid-auto-rows: max-content;
   align-content: start;
   gap: 8px;
+}
+
+.project-pagination {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-pagination .muted {
+  text-align: center;
+}
+
+.project-pagination .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .project-list button {

@@ -13,10 +13,16 @@ const openHeatmap = document.getElementById('openHeatmap');
 const closeHeatmap = document.getElementById('closeHeatmap');
 const heatmapOverlay = document.getElementById('heatmapOverlay');
 const heatmapGrid = document.getElementById('heatmapGrid');
+const projectPagination = document.getElementById('projectPagination');
+const projectPrev = document.getElementById('projectPrev');
+const projectNext = document.getElementById('projectNext');
+const projectPageInfo = document.getElementById('projectPageInfo');
 
 let projects = [];
 let selectedProjectId = null;
 let heatmapItems = [];
+const projectsPerPage = 7;
+let projectPage = 1;
 
 refreshProjects.addEventListener('click', () => loadProjects());
 openHeatmap.addEventListener('click', () => {
@@ -24,6 +30,17 @@ openHeatmap.addEventListener('click', () => {
   toggleHeatmapOverlay(!isOpen);
 });
 closeHeatmap.addEventListener('click', () => toggleHeatmapOverlay(false));
+projectPrev.addEventListener('click', () => changeProjectPage(-1));
+projectNext.addEventListener('click', () => changeProjectPage(1));
+
+function totalProjectPages() {
+  return Math.max(1, Math.ceil(projects.length / projectsPerPage));
+}
+
+function changeProjectPage(offset) {
+  projectPage = Math.max(1, Math.min(totalProjectPages(), projectPage + offset));
+  renderProjectList();
+}
 
 function toggleHeatmapOverlay(open) {
   heatmapOverlay.classList.toggle('open', open);
@@ -36,6 +53,11 @@ async function loadProjects() {
     if (!res.ok) throw new Error(`failed to load projects (${res.status})`);
     const data = await res.json();
     projects = data.items || [];
+
+    if (projectPage > totalProjectPages()) {
+      projectPage = totalProjectPages();
+    }
+
     renderProjectList();
 
     if (!selectedProjectId && projects.length > 0) {
@@ -55,7 +77,15 @@ async function loadProjects() {
 function renderProjectList() {
   projectList.innerHTML = '';
 
+  const pages = totalProjectPages();
+  const selectedIndex = projects.findIndex((p) => p.id === selectedProjectId);
+  if (selectedIndex >= 0) {
+    projectPage = Math.floor(selectedIndex / projectsPerPage) + 1;
+  }
+  projectPage = Math.max(1, Math.min(pages, projectPage));
+
   if (projects.length === 0) {
+    projectPagination.style.display = 'none';
     const li = document.createElement('li');
     li.textContent = 'No projects found.';
     li.className = 'muted';
@@ -63,7 +93,17 @@ function renderProjectList() {
     return;
   }
 
-  for (const project of projects) {
+  const showPagination = projects.length > projectsPerPage;
+  projectPagination.style.display = showPagination ? 'grid' : 'none';
+  projectPageInfo.textContent = `Page ${projectPage} / ${pages}`;
+  projectPrev.disabled = projectPage <= 1;
+  projectNext.disabled = projectPage >= pages;
+
+  const start = (projectPage - 1) * projectsPerPage;
+  const end = start + projectsPerPage;
+  const pageItems = projects.slice(start, end);
+
+  for (const project of pageItems) {
     const li = document.createElement('li');
     const btn = document.createElement('button');
     btn.className = selectedProjectId === project.id ? 'active' : '';

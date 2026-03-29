@@ -19,7 +19,14 @@
           <button id="refreshProjects" class="btn">Refresh</button>
           <button id="openHeatmap" class="btn">Open Heatmap</button>
         </div>
-        <ul id="projectList" class="project-list"></ul>
+        <div class="project-list-wrap">
+          <ul id="projectList" class="project-list"></ul>
+        </div>
+        <div id="projectPagination" class="project-pagination" aria-label="Project list pagination">
+          <button id="projectPrev" class="btn" type="button">Prev</button>
+          <p id="projectPageInfo" class="muted">Page 1 / 1</p>
+          <button id="projectNext" class="btn" type="button">Next</button>
+        </div>
       </aside>
 
       <section class="content">
