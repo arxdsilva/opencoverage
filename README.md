@@ -2,36 +2,69 @@
 
 [![CI](https://github.com/arxdsilva/opencoverage/actions/workflows/ci.yml/badge.svg)](https://github.com/arxdsilva/opencoverage/actions/workflows/ci.yml)
 
-Go REST API for ingesting coverage runs and computing coverage deltas.
+Self-hosted Go code coverage API and dashboard for ingesting test coverage, comparing deltas, and tracking trends across projects, branches, and teams.
 
-## Architecture
+`coverage-api` is part of the `opencoverage` project and is designed for developer teams that want coverage visibility in their own infrastructure.
 
-This project follows Hexagonal Architecture (ports and adapters):
+## Why coverage-api
 
-- `cmd/api` - application bootstrap
-- `internal/domain` - entities and deterministic domain logic
-- `internal/application` - use cases and ports
-- `internal/adapters/http` - HTTP transport and middleware
-- `internal/adapters/postgres` - repository implementations
-- `internal/adapters/auth` - API key authentication adapter
-- `internal/platform` - config and infrastructure utilities
+- Ingest Go coverage results from local runs or CI pipelines
+- Compute deterministic baseline comparisons and deltas
+- Track project and package-level coverage history
+- Group projects (for team-level reporting)
+- Integrate with GitHub Actions and other CI systems
+- Self-host API + frontend with PostgreSQL
 
-## Requirements
+## Key Features
+
+- REST API with `/v1` endpoints for ingest, history, and latest comparison
+- Coverage CLI to convert `coverage.out` into API-ready JSON payloads
+- Dashboard frontend for project, trend, and heatmap visualization
+- API key authentication for protected endpoints
+- Hexagonal Architecture (ports and adapters)
+
+## Quick Start (Docker Compose)
+
+Run the full local stack (PostgreSQL + migrations + API + frontend):
+
+```bash
+make compose-up
+```
+
+If local port `5432` is already in use:
+
+```bash
+DB_PORT=5433 make compose-up
+```
+
+Access services:
+
+- API: `http://localhost:8080`
+- Frontend dashboard: `http://localhost:8090`
+- Health check: `http://localhost:8080/healthz`
+
+Stop the stack:
+
+```bash
+make compose-down
+```
+
+## Local Development
+
+Requirements:
 
 - Go 1.23+
 - PostgreSQL 14+
 
-## Configuration
-
-Environment variables:
+Core environment variables:
 
 - `DATABASE_URL` (required)
+- `API_KEY_SECRET` (required)
 - `SERVER_ADDR` (default `:8080`)
 - `API_KEY_HEADER` (default `X-API-Key`)
-- `API_KEY_SECRET` (required; value expected in the API key header)
 - `SHUTDOWN_TIMEOUT_SECONDS` (default `10`)
 
-## Run
+Run API locally:
 
 ```bash
 export DATABASE_URL="postgres://coverage:coverage@localhost:5432/coverage?sslmode=disable"
@@ -39,32 +72,23 @@ export API_KEY_SECRET="dev-local-key"
 go run ./cmd/api
 ```
 
-Start full local stack with Docker Compose (db + migrate + api):
+Run frontend locally:
 
 ```bash
-make compose-up
+make frontend-run
 ```
 
-If port `5432` is already in use on your machine, override it:
+Useful developer commands:
 
 ```bash
-DB_PORT=5433 make compose-up
-```
-
-## Migrations
-
-Initial schema is in `migrations/001_init.sql`.
-
-Common migration commands:
-
-```bash
+make deps
+make fmt
+make test
 make migrate-status
 make migrate-up
-make migrate-down
-make migrate-create name=add_new_table
 ```
 
-## API
+## API Overview
 
 Main endpoints:
 
@@ -74,291 +98,122 @@ Main endpoints:
 - `GET /v1/projects/{projectId}/coverage-runs`
 - `GET /v1/projects/{projectId}/coverage-runs/latest-comparison`
 
-For full contract details, see `SPEC.md`.
+For full API contract details, see [SPEC.md](SPEC.md).
 
-## Usage (curl)
+## Ingest Coverage With cURL
 
-Set variables first:
+Set variables:
 
 ```bash
 export BASE_URL="http://localhost:8080"
 export API_KEY="dev-local-key"
-export PROJECT_ID="replace-with-project-id"
 ```
 
-Health check (no auth):
-
-```bash
-curl -i "$BASE_URL/healthz"
-```
-
-Ingest a coverage run:
+Send a coverage run:
 
 ```bash
 curl -i -X POST "$BASE_URL/v1/coverage-runs" \
-	-H "Content-Type: application/json" \
-	-H "X-API-Key: $API_KEY" \
-	-d '{
-		"projectKey": "org/repo-service",
-		"projectName": "repo-service",
-		"projectGroup": "platform-team",
-		"defaultBranch": "main",
-		"branch": "main",
-		"commitSha": "a1b2c3d4",
-		"author": "alice",
-		"triggerType": "push",
-		"runTimestamp": "2026-03-28T12:00:00Z",
-		"totalCoveragePercent": 83.42,
-		"packages": [
-			{"importPath": "github.com/acme/repo-service/internal/api", "coveragePercent": 85.10},
-			{"importPath": "github.com/acme/repo-service/internal/service", "coveragePercent": 80.70}
-		]
-	}'
-```
-
-Get project metadata:
-
-```bash
-curl -i "$BASE_URL/v1/projects/$PROJECT_ID" \
-	-H "X-API-Key: $API_KEY"
-```
-
-List coverage runs (paginated):
-
-```bash
-curl -i "$BASE_URL/v1/projects/$PROJECT_ID/coverage-runs?page=1&pageSize=20&branch=main" \
-	-H "X-API-Key: $API_KEY"
-```
-
-Get latest comparison:
-
-```bash
-curl -i "$BASE_URL/v1/projects/$PROJECT_ID/coverage-runs/latest-comparison" \
-	-H "X-API-Key: $API_KEY"
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{
+    "projectKey": "org/repo-service",
+    "projectName": "repo-service",
+    "projectGroup": "platform-team",
+    "defaultBranch": "main",
+    "branch": "main",
+    "commitSha": "a1b2c3d4",
+    "author": "alice",
+    "triggerType": "push",
+    "runTimestamp": "2026-03-28T12:00:00Z",
+    "totalCoveragePercent": 83.42,
+    "packages": [
+      {"importPath": "github.com/acme/repo-service/internal/api", "coveragePercent": 85.10},
+      {"importPath": "github.com/acme/repo-service/internal/service", "coveragePercent": 80.70}
+    ]
+  }'
 ```
 
 ## Coverage CLI Workflow
 
-Use the CLI tool to generate ingest payloads from Go coverage profiles:
+Generate payload from Go coverage profile:
 
 ```bash
 go run ./cmd/coveragecli \
-	-coverprofile coverage.out \
-	-out coverage-upload.json \
-	-project-key "github.com/example/repo" \
-	-project-name "repo" \
-	-project-group "platform" \
-	-default-branch "main" \
-	-branch "main" \
-	-commit-sha "abc123" \
-	-author "alice"
+  -coverprofile coverage.out \
+  -out coverage-upload.json \
+  -project-key "github.com/example/repo" \
+  -project-name "repo" \
+  -project-group "platform" \
+  -default-branch "main" \
+  -branch "main" \
+  -commit-sha "abc123" \
+  -author "alice"
 ```
 
-### Ingest Response Example (`POST /v1/coverage-runs`)
-
-When a record is created, the API returns project/run metadata plus computed comparison and package deltas.
-
-Example response:
-
-```json
-{
-	"project": {
-		"id": "1b22413a-f9d2-4675-8ab9-f0ee309ef871",
-		"projectKey": "github.com/arxdsilva/opencoverage",
-		"name": "coverage-api",
-		"defaultBranch": "main",
-		"globalThresholdPercent": 80,
-		"created": true
-	},
-	"run": {
-		"id": "0f171469-1cf6-4172-9334-b29381dd23de",
-		"branch": "main",
-		"commitSha": "local",
-		"author": "local",
-		"triggerType": "manual",
-		"runTimestamp": "2026-03-28T22:18:18Z",
-		"totalCoveragePercent": 1.9
-	},
-	"comparison": {
-		"baselineSource": "latest_default_branch",
-		"previousTotalCoveragePercent": null,
-		"currentTotalCoveragePercent": 1.9,
-		"deltaPercent": null,
-		"direction": "new",
-		"thresholdPercent": 80,
-		"thresholdStatus": "failed"
-	},
-	"packages": [
-		{
-			"importPath": "github.com/arxdsilva/opencoverage/internal/domain",
-			"previousCoveragePercent": null,
-			"currentCoveragePercent": 50,
-			"deltaPercent": null,
-			"direction": "new"
-		}
-	]
-}
-```
-
-Fields typically used in CI policy:
-
-- `comparison.thresholdStatus` (`passed` or `failed`)
-- `comparison.deltaPercent` (negative means coverage dropped)
-- `comparison.currentTotalCoveragePercent`
-- `comparison.previousTotalCoveragePercent`
-
-## Self-Hosted Deployment
-
-For detailed instructions on deploying coverage-api and its frontend on your own infrastructure, see [SELF_HOSTING.md](SELF_HOSTING.md). Covers:
-
-- Quick start with Docker Compose
-- Production-grade container deployment
-- Database setup and migrations
-- Networking and reverse proxy configuration
-- Security and authentication
-- Monitoring, backups, and troubleshooting
-
-## GitHub Actions
-
-For detailed GitHub Actions workflow examples, see [GITHUB_ACTIONS_INTEGRATION.md](GITHUB_ACTIONS_INTEGRATION.md).
-
-Workflow file: `.github/workflows/ci.yml`
-
-It runs tests on pushes and pull requests, generates a coverage profile artifact, and optionally uploads coverage to this API on push events.
-
-To enable coverage upload from CI, add these repository secrets:
-
-- `COVERAGE_API_URL` (example: `https://your-api.example.com/v1/coverage-runs`)
-- `COVERAGE_API_KEY`
-
-Install the CLI from GitHub:
-
-```bash
-go install github.com/arxdsilva/opencoverage/cmd/coveragecli@latest
-```
-
-CI-friendly (pin to a specific ref/tag/commit):
-
-```bash
-go install github.com/arxdsilva/opencoverage/cmd/coveragecli@v1.0.0
-# or
-go install github.com/arxdsilva/opencoverage/cmd/coveragecli@<git-sha>
-```
-
-GitHub Actions step example:
-
-```yaml
-- name: Install coverage CLI
-	run: go install github.com/arxdsilva/opencoverage/cmd/coveragecli@latest
-
-- name: Upload coverage to API
-	env:
-		API_KEY: ${{ secrets.COVERAGE_API_KEY }}
-	run: |
-		go test ./... -coverprofile=coverage.out
-		coveragecli \
-			-coverprofile coverage.out \
-			-out coverage-upload.json \
-			-api-url https://your-api.example.com/v1/coverage-runs \
-			-api-key "$API_KEY" \
-			-project-key github.com/your-org/your-repo \
-			-project-name your-repo \
-			-branch "$GITHUB_REF_NAME" \
-			-commit-sha "$GITHUB_SHA" \
-			-author "github-actions" \
-			-trigger-type push \
-			-upload
-```
-
-### PR Coverage Interaction (Warning or Fail)
-
-For pull requests, you can upload coverage and then decide policy from API response:
-
-1. **Warning mode**: annotate PR with a warning, but do not fail job.
-2. **Fail mode**: fail job when `comparison.thresholdStatus == "failed"`.
-
-Example PR step (requires `jq` on runner):
-
-```yaml
-- name: Upload PR coverage and capture response
-	id: pr_coverage
-	if: ${{ github.event_name == 'pull_request' && secrets.COVERAGE_API_URL != '' && secrets.COVERAGE_API_KEY != '' }}
-	env:
-		API_URL: ${{ secrets.COVERAGE_API_URL }}
-		API_KEY: ${{ secrets.COVERAGE_API_KEY }}
-	run: |
-		go test ./... -coverprofile=coverage.out
-		go run ./cmd/coveragecli \
-			-coverprofile coverage.out \
-			-out coverage-upload.json \
-			-project-key "${{ github.repository }}" \
-			-project-name "${{ github.event.repository.name }}" \
-			-branch "${{ github.head_ref }}" \
-			-commit-sha "${{ github.sha }}" \
-			-author "github-actions" \
-			-trigger-type pr
-
-		RESPONSE=$(curl -sS -X POST "$API_URL" \
-			-H "Content-Type: application/json" \
-			-H "X-API-Key: $API_KEY" \
-			--data-binary @coverage-upload.json)
-
-		echo "$RESPONSE" > coverage-api-response.json
-
-		STATUS=$(jq -r '.comparison.thresholdStatus' coverage-api-response.json)
-		CURRENT=$(jq -r '.comparison.currentTotalCoveragePercent' coverage-api-response.json)
-		PREV=$(jq -r '.comparison.previousTotalCoveragePercent' coverage-api-response.json)
-		DELTA=$(jq -r '.comparison.deltaPercent' coverage-api-response.json)
-
-		echo "thresholdStatus=$STATUS" >> "$GITHUB_OUTPUT"
-		echo "currentCoverage=$CURRENT" >> "$GITHUB_OUTPUT"
-		echo "previousCoverage=$PREV" >> "$GITHUB_OUTPUT"
-		echo "deltaCoverage=$DELTA" >> "$GITHUB_OUTPUT"
-```
-
-Warning-only policy:
-
-```yaml
-- name: Warn when threshold fails
-	if: ${{ steps.pr_coverage.outputs.thresholdStatus == 'failed' }}
-	run: |
-		echo "::warning title=Coverage Threshold Failed::Current=${{ steps.pr_coverage.outputs.currentCoverage }} Previous=${{ steps.pr_coverage.outputs.previousCoverage }} Delta=${{ steps.pr_coverage.outputs.deltaCoverage }}"
-```
-
-Failing policy:
-
-```yaml
-- name: Fail when threshold fails
-	if: ${{ steps.pr_coverage.outputs.thresholdStatus == 'failed' }}
-	run: |
-		echo "Coverage threshold failed"
-		exit 1
-```
-
-Generate Go coverage profile and API payload file:
-
-```bash
-make coverage-file
-```
-
-This creates:
-
-- `coverage.out` (Go cover profile)
-- `coverage-upload.json` (API-ready JSON payload)
-
-Generate and upload in one step:
+Generate and upload in one command:
 
 ```bash
 make coverage-upload API_URL="http://localhost:8080/v1/coverage-runs" API_KEY="dev-local-key"
 ```
 
-Sample command to send an existing payload file from Go CLI to the API:
+Install CLI from GitHub:
 
 ```bash
-go run ./cmd/coveragecli \
-	-coverprofile coverage.out \
-	-out coverage-upload.json \
-	-api-url http://localhost:8080/v1/coverage-runs \
-	-api-key dev-local-key \
-	-upload
+go install github.com/arxdsilva/opencoverage/cmd/coveragecli@latest
 ```
+
+## Architecture
+
+This project follows Hexagonal Architecture (ports and adapters):
+
+- `cmd/api` - bootstrap and dependency wiring
+- `internal/domain` - entities, invariants, deterministic domain logic
+- `internal/application` - use cases and ports
+- `internal/adapters/http` - handlers, DTOs, middleware
+- `internal/adapters/postgres` - repository implementations
+- `internal/adapters/auth` - API key authentication adapter
+- `internal/platform` - config and infrastructure utilities
+
+## Database and Migrations
+
+Migration files are in `migrations/`.
+
+Common commands:
+
+```bash
+make migrate-status
+make migrate-up
+make migrate-down
+make migrate-create name=add_new_table
+```
+
+Seed local database:
+
+```bash
+make seed
+```
+
+## CI/CD and GitHub Actions
+
+For complete CI examples (unit tests, `coverage.out`, CLI payload generation, upload to self-hosted API), see [GITHUB_ACTIONS_INTEGRATION.md](GITHUB_ACTIONS_INTEGRATION.md).
+
+The examples include:
+
+- Configurable project metadata (`project key`, `name`, `group`)
+- Push and pull request workflows
+- Multi-project matrix workflows for monorepos
+- PR comments and threshold-based quality gates
+
+## Frontend and Product Docs
+
+- Frontend behavior and UI notes: [frontend.md](frontend.md)
+- API contract and response model: [SPEC.md](SPEC.md)
+- Contribution/PR workflow: [making-a-PR.md](making-a-PR.md)
+
+## Typical Integration Flow
+
+1. Run tests and produce `coverage.out`.
+2. Convert coverage profile to JSON payload with `coveragecli`.
+3. Upload payload to `POST /v1/coverage-runs`.
+4. Read comparison metadata (`thresholdStatus`, `deltaPercent`) in CI.
+5. Visualize trends and project groups in the dashboard.
