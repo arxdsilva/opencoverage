@@ -19,7 +19,7 @@ Self-hosted Go code coverage API and dashboard for ingesting test coverage, comp
 
 - REST API with `/v1` endpoints for ingest, history, and latest comparison
 - Coverage CLI to convert `coverage.out` into API-ready JSON payloads
-- Dashboard frontend for project, trend, and heatmap visualization
+- Dashboard frontend for project, multi-branch trend, comparison, and heatmap visualization
 - API key authentication for protected endpoints
 - Hexagonal Architecture (ports and adapters)
 
@@ -209,6 +209,12 @@ The examples include:
 - Frontend behavior and UI notes: [frontend.md](frontend.md)
 - API contract and response model: [SPEC.md](SPEC.md)
 - Contribution/PR workflow: [making-a-PR.md](making-a-PR.md)
+
+Frontend highlights:
+
+- Project overview includes a multi-branch coverage trend chart.
+- The trend view overlays the default branch with all discovered branches for the selected project.
+- The branch selector is used for latest-comparison details, not for filtering the trend chart.
 
 ## Typical Integration Flow
 

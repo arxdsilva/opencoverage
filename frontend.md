@@ -7,9 +7,24 @@ This repository includes a separate frontend entrypoint at `cmd/frontend`.
 The frontend is a dark-theme dashboard inspired by observability UIs (SigNoz-like):
 
 - project list
+- multi-branch coverage trend chart
 - latest comparison summary
 - package-level comparison table
 - recent runs table
+
+## Coverage Trend
+
+The overview card includes a `Coverage Trend` graph for the selected project.
+
+Current behavior:
+
+- always shows the default branch plus every discovered project branch on the same graph
+- loads up to `10` recent runs per branch
+- uses run time on the X axis rather than commit SHA labels
+- highlights the default branch separately so it remains easy to compare against feature branches
+- updates when the selected project changes
+
+The branch selector below the overview card does **not** filter the trend graph. It controls the latest comparison panel and package comparison table only.
 
 ## No User Authentication
 
@@ -102,11 +117,13 @@ Ungrouped projects appear in an "Ungrouped" panel at the bottom of the heatmap.
 The frontend server exposes unauthenticated GET routes for browser use:
 
 - `GET /api/projects`
+- `GET /api/projects/{projectId}/branches`
 - `GET /api/projects/{projectId}/coverage-runs`
 - `GET /api/projects/{projectId}/coverage-runs/latest-comparison`
 
 These are proxied to:
 
 - `GET /v1/projects`
+- `GET /v1/projects/{projectId}/branches`
 - `GET /v1/projects/{projectId}/coverage-runs`
 - `GET /v1/projects/{projectId}/coverage-runs/latest-comparison`

@@ -191,6 +191,12 @@ h3 {
   position: relative;
   flex: 1;
   min-height: 110px;
+  width: min(50%, 520px);
+  align-self: center;
+}
+
+.trend-chart-wrap canvas {
+  width: 100% !important;
 }
 
 .muted {
@@ -703,6 +709,10 @@ td.code {
 
   .overview-row {
     grid-template-columns: 1fr;
+  }
+
+  .trend-chart-wrap {
+    width: 100%;
   }
 
   .heatmap-grid {

@@ -20,6 +20,7 @@ const compareCurrent = document.getElementById('compareCurrent');
 const compareBaseline = document.getElementById('compareBaseline');
 const compareRunType = document.getElementById('compareRunType');
 const branchSelector = document.getElementById('branchSelector');
+const trendSubtitle = document.getElementById('trendSubtitle');
 
 let projects = [];
 let allProjects = [];
@@ -30,6 +31,7 @@ let availableBranches = [];
 let heatmapItems = [];
 let trendChart = null;
 let heatmapLayoutFrame = 0;
+let trendRequestSequence = 0;
 
 refreshProjects.addEventListener('click', () => loadProjects());
 openHeatmap.addEventListener('click', () => {
@@ -133,13 +135,18 @@ async function selectProject(projectId) {
   projectSearchInput.value = '';
   renderHeatmap();
 
-  const project = projects.find((p) => p.id === projectId) || allProjects.find((p) => p.id === projectId);
+  const project = getProjectById(projectId);
   selectedProjectName.textContent = project?.name || project?.projectKey || 'Project';
   selectedProjectMeta.textContent = `${project?.projectKey || ''} - default branch: ${project?.defaultBranch || 'main'} - threshold: ${pct(project?.globalThresholdPercent)}`;
 
   const defaultBranch = project?.defaultBranch || 'main';
-  await Promise.all([loadBranches(projectId), loadRecentRuns(projectId), loadTrendChart(projectId, defaultBranch)]);
+  const branches = await loadBranches(projectId);
+  await Promise.all([loadRecentRuns(projectId), loadTrendChart(projectId, defaultBranch, branches)]);
   await loadLatestComparison(projectId);
+}
+
+function getProjectById(projectId) {
+  return projects.find((project) => project.id === projectId) || allProjects.find((project) => project.id === projectId);
 }
 
 async function loadHeatmap() {
@@ -428,9 +435,12 @@ async function loadBranches(projectId) {
     const data = await res.json();
     availableBranches = data.branches || [];
     renderBranchSelector();
+    return availableBranches;
   } catch (err) {
     console.error('Error loading branches:', err);
     branchSelector.innerHTML = '<option value="">Error loading branches</option>';
+    availableBranches = [];
+    return availableBranches;
   }
 }
 
@@ -518,66 +528,94 @@ async function loadLatestComparison(projectId) {
   }
 }
 
-async function loadTrendChart(projectId, defaultBranch) {
+async function loadTrendChart(projectId, defaultBranch, branches = availableBranches) {
   const canvas = document.getElementById('trendChart');
   if (!canvas) return;
 
-  try {
-    const url = new URL(`/api/projects/${projectId}/coverage-runs`, window.location.origin);
-    url.searchParams.set('branch', defaultBranch);
-    url.searchParams.set('page', '1');
-    url.searchParams.set('pageSize', '5');
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`failed to load trend data (${res.status})`);
-    const data = await res.json();
+  const requestSequence = ++trendRequestSequence;
 
-    // API returns newest first; reverse for left-to-right chronological order
-    const runs = [...(data.items || [])].reverse();
-    const labels = runs.map(r => r.commitSha.slice(0, 7));
-    const values = runs.map(r => r.totalCoveragePercent);
+  try {
+    const branchNames = getTrendBranches(defaultBranch, branches);
+    updateTrendSubtitle(branchNames.length);
+
+    const seriesResults = await Promise.all(
+      branchNames.map(async (branchName) => {
+        try {
+          const data = await loadTrendSeries(projectId, branchName);
+          return { branchName, data };
+        } catch (err) {
+          console.error(`Error loading trend data for branch ${branchName}:`, err);
+          return { branchName, data: [] };
+        }
+      }),
+    );
+
+    if (requestSequence !== trendRequestSequence || selectedProjectId !== projectId) {
+      return;
+    }
 
     if (trendChart) {
       trendChart.destroy();
       trendChart = null;
     }
 
-    if (values.length === 0) return;
+    const datasets = seriesResults
+      .filter((result) => result.data.length > 0)
+      .map((result, index) => buildTrendDataset(result.branchName, result.data, trendColorForIndex(index, result.branchName === defaultBranch)));
 
-    const minVal = Math.max(0, Math.min(...values) - 5);
-    const maxVal = Math.min(100, Math.max(...values) + 5);
+    const allValues = datasets.flatMap((dataset) => dataset.data.map((point) => point.y));
+    if (allValues.length === 0) return;
+
+    const minVal = Math.max(0, Math.min(...allValues) - 5);
+    const maxVal = Math.min(100, Math.max(...allValues) + 5);
 
     trendChart = new Chart(canvas, {
       type: 'line',
       data: {
-        labels,
-        datasets: [{
-          label: 'Coverage %',
-          data: values,
-          borderColor: '#14d8ff',
-          backgroundColor: 'rgba(20, 216, 255, 0.08)',
-          pointBackgroundColor: '#14d8ff',
-          pointBorderColor: '#14d8ff',
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          tension: 0.3,
-          fill: true,
-        }],
+        datasets,
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        parsing: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true,
+            labels: {
+              color: '#d5def2',
+              font: { family: 'Space Grotesk', size: 12 },
+            },
+          },
           tooltip: {
             callbacks: {
-              label: (ctx) => ` ${ctx.raw.toFixed(2)}%`,
+              title: (items) => {
+                const point = items[0]?.raw;
+                if (!point) return '';
+                return `${point.branch} · ${new Date(point.runTimestamp).toLocaleString()}`;
+              },
+              label: (ctx) => {
+                const point = ctx.raw;
+                return ` ${ctx.dataset.label}: ${point.y.toFixed(2)}%`;
+              },
             },
           },
         },
         scales: {
           x: {
+            type: 'linear',
             grid: { color: 'rgba(39, 52, 81, 0.5)' },
-            ticks: { color: '#a4b2cf', font: { family: 'JetBrains Mono', size: 11 } },
+            ticks: {
+              color: '#a4b2cf',
+              font: { family: 'JetBrains Mono', size: 11 },
+              callback: (value) => formatTrendTick(value),
+              maxTicksLimit: 5,
+            },
+            title: {
+              display: true,
+              text: 'Run Time',
+              color: '#a4b2cf',
+              font: { family: 'Space Grotesk', size: 11 },
+            },
           },
           y: {
             min: minVal,
@@ -593,8 +631,88 @@ async function loadTrendChart(projectId, defaultBranch) {
       },
     });
   } catch (err) {
+    if (requestSequence !== trendRequestSequence || selectedProjectId !== projectId) {
+      return;
+    }
+
     console.error('Error loading trend chart:', err);
   }
+}
+
+async function loadTrendSeries(projectId, branch) {
+  const url = new URL(`/api/projects/${projectId}/coverage-runs`, window.location.origin);
+  url.searchParams.set('branch', branch);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('pageSize', '10');
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`failed to load trend data (${res.status})`);
+
+  const data = await res.json();
+  return (data.items || [])
+    .map((run) => ({
+      x: new Date(run.runTimestamp).getTime(),
+      y: run.totalCoveragePercent,
+      branch: run.branch,
+      commitSha: run.commitSha,
+      runTimestamp: run.runTimestamp,
+    }))
+    .sort((left, right) => left.x - right.x);
+}
+
+function buildTrendDataset(label, data, colors) {
+  return {
+    label,
+    data,
+    borderColor: colors.borderColor,
+    backgroundColor: colors.backgroundColor,
+    pointBackgroundColor: colors.pointBackgroundColor,
+    pointBorderColor: colors.pointBorderColor,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+    tension: 0.3,
+    fill: false,
+  };
+}
+
+function getTrendBranches(defaultBranch, branches) {
+  const names = Array.isArray(branches) ? branches : [];
+  return Array.from(new Set([defaultBranch, ...names.filter(Boolean)]));
+}
+
+function updateTrendSubtitle(branchCount) {
+  if (!trendSubtitle) return;
+
+  trendSubtitle.textContent = `Up to 10 recent runs across ${branchCount} branch${branchCount === 1 ? '' : 'es'}`;
+}
+
+function formatTrendTick(value) {
+  const date = new Date(Number(value));
+  if (Number.isNaN(date.getTime())) return '';
+
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function trendColorForIndex(index, isDefaultBranch) {
+  if (isDefaultBranch) {
+    return {
+      borderColor: '#14d8ff',
+      backgroundColor: 'rgba(20, 216, 255, 0.12)',
+      pointBackgroundColor: '#14d8ff',
+      pointBorderColor: '#14d8ff',
+    };
+  }
+
+  const palette = [
+    { borderColor: '#ff8a3d', backgroundColor: 'rgba(255, 138, 61, 0.12)', pointBackgroundColor: '#ff8a3d', pointBorderColor: '#ff8a3d' },
+    { borderColor: '#7ef07a', backgroundColor: 'rgba(126, 240, 122, 0.12)', pointBackgroundColor: '#7ef07a', pointBorderColor: '#7ef07a' },
+    { borderColor: '#ffd84d', backgroundColor: 'rgba(255, 216, 77, 0.12)', pointBackgroundColor: '#ffd84d', pointBorderColor: '#ffd84d' },
+    { borderColor: '#ff5f87', backgroundColor: 'rgba(255, 95, 135, 0.12)', pointBackgroundColor: '#ff5f87', pointBorderColor: '#ff5f87' },
+    { borderColor: '#8fa8ff', backgroundColor: 'rgba(143, 168, 255, 0.12)', pointBackgroundColor: '#8fa8ff', pointBorderColor: '#8fa8ff' },
+    { borderColor: '#5eead4', backgroundColor: 'rgba(94, 234, 212, 0.12)', pointBackgroundColor: '#5eead4', pointBorderColor: '#5eead4' },
+  ];
+
+  return palette[index % palette.length];
 }
 
 async function loadRecentRuns(projectId) {
