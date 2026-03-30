@@ -76,6 +76,27 @@ Services started by compose:
 
 `frontend-dev` prints the two commands to run API and frontend in separate terminals.
 
+## Heatmap and Group Visualization
+
+The dashboard includes an interactive heatmap view of all projects accessible via the "Open Heatmap" button.
+
+### Features
+
+- **Group Organization**: Projects with an assigned group appear as balanced panels within the heatmap overlay
+- **Responsive Layout**: Groups automatically reflow to fill the visible overlay area as panels
+- **Color Coding**: Groups are color-coded by overall status (green for passing/up, red for failing/down, neutral for other states)
+- **Per-Group Tiles**: Each group contains project tiles sized to fill the group's allocated space
+- **Real-time Relayout**: Groups reflow on window resize to maintain optimal use of screen space
+
+### Group Colors
+
+Heatmap groups are colored based on the aggregate status of their projects:
+- **Green (up/passed)**: Group has more passing projects or average coverage >= 80%
+- **Red (down/failed)**: Group has more failing projects or average coverage < 80%
+- **Neutral**: No projects with data, or mixed status
+
+Ungrouped projects appear in an "Ungrouped" panel at the bottom of the heatmap.
+
 ## Exposed Frontend API Proxy Routes
 
 The frontend server exposes unauthenticated GET routes for browser use:

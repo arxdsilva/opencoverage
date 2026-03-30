@@ -81,10 +81,11 @@ REST, versioned under `/v1`.
 1. id (UUID, server-generated)
 2. project_key (string, client-provided identifier used to find project)
 3. name (string, optional display name)
-4. default_branch (string, default `main`)
-5. global_threshold_percent (numeric(5,2), default 80.00)
-6. created_at (timestamp)
-7. updated_at (timestamp)
+4. group (string, optional group name for organizing projects in UI)
+5. default_branch (string, default `main`)
+6. global_threshold_percent (numeric(5,2), default 80.00)
+7. created_at (timestamp)
+8. updated_at (timestamp)
 
 #### CoverageRun
 1. id (UUID)
@@ -110,6 +111,7 @@ CREATE TABLE projects (
   id UUID PRIMARY KEY,
   project_key TEXT NOT NULL UNIQUE,
   name TEXT,
+  "group" TEXT,
   default_branch TEXT NOT NULL DEFAULT 'main',
   global_threshold_percent NUMERIC(5,2) NOT NULL DEFAULT 80.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -172,6 +174,7 @@ CREATE INDEX package_coverages_import_path_idx ON package_coverages(package_impo
 {
   "projectKey": "org/repo-service",
   "projectName": "repo-service",
+  "projectGroup": "platform-team",
   "defaultBranch": "main",
   "branch": "main",
   "commitSha": "a1b2c3d4",

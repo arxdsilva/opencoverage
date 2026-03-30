@@ -101,6 +101,7 @@ curl -i -X POST "$BASE_URL/v1/coverage-runs" \
 	-d '{
 		"projectKey": "org/repo-service",
 		"projectName": "repo-service",
+		"projectGroup": "platform-team",
 		"defaultBranch": "main",
 		"branch": "main",
 		"commitSha": "a1b2c3d4",
@@ -137,6 +138,21 @@ curl -i "$BASE_URL/v1/projects/$PROJECT_ID/coverage-runs/latest-comparison" \
 ```
 
 ## Coverage CLI Workflow
+
+Use the CLI tool to generate ingest payloads from Go coverage profiles:
+
+```bash
+go run ./cmd/coveragecli \
+	-coverprofile coverage.out \
+	-out coverage-upload.json \
+	-project-key "github.com/example/repo" \
+	-project-name "repo" \
+	-project-group "platform" \
+	-default-branch "main" \
+	-branch "main" \
+	-commit-sha "abc123" \
+	-author "alice"
+```
 
 ### Ingest Response Example (`POST /v1/coverage-runs`)
 

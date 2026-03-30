@@ -48,6 +48,7 @@ go run ./cmd/coveragecli \
   -out coverage-upload.json \
   -project-key "${GITHUB_REPOSITORY}" \
   -project-name "${GITHUB_REPOSITORY##*/}" \
+  -project-group "team-name" \
   -branch "${GITHUB_HEAD_REF}" \
   -commit-sha "${GITHUB_SHA}" \
   -author "github-actions" \

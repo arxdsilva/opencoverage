@@ -26,6 +26,7 @@ type packageCoverage struct {
 type ingestPayload struct {
 	ProjectKey           string            `json:"projectKey"`
 	ProjectName          string            `json:"projectName,omitempty"`
+	ProjectGroup         *string           `json:"projectGroup,omitempty"`
 	DefaultBranch        string            `json:"defaultBranch,omitempty"`
 	Branch               string            `json:"branch"`
 	CommitSHA            string            `json:"commitSha"`
@@ -41,6 +42,7 @@ func main() {
 	out := flag.String("out", "coverage-upload.json", "Path to output JSON payload file")
 	projectKey := flag.String("project-key", "github.com/arxdsilva/coverage-api", "Project key")
 	projectName := flag.String("project-name", "coverage-api", "Project display name")
+	projectGroup := flag.String("project-group", "", "Project group (optional)")
 	defaultBranch := flag.String("default-branch", "main", "Default branch")
 	branch := flag.String("branch", envOrDefault("COVERAGE_BRANCH", "main"), "Current branch")
 	commitSHA := flag.String("commit-sha", envOrDefault("COVERAGE_COMMIT_SHA", "local"), "Commit SHA")
@@ -60,9 +62,15 @@ func main() {
 		exitErr("parse coverage", fmt.Errorf("no package coverage entries found"))
 	}
 
+	var group *string
+	if *projectGroup != "" {
+		group = projectGroup
+	}
+
 	payload := ingestPayload{
 		ProjectKey:           *projectKey,
 		ProjectName:          *projectName,
+		ProjectGroup:         group,
 		DefaultBranch:        *defaultBranch,
 		Branch:               *branch,
 		CommitSHA:            *commitSHA,
