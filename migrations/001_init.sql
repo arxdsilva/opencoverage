@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY,
   project_key TEXT NOT NULL UNIQUE,
   name TEXT,
+  group_name TEXT DEFAULT NULL,
   default_branch TEXT NOT NULL DEFAULT 'main',
   global_threshold_percent NUMERIC(5,2) NOT NULL DEFAULT 80.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -23,13 +23,14 @@ func (r *ProjectRepository) GetByKey(ctx context.Context, projectKey string) (do
 	q := getQuerier(ctx, r.pool)
 	var p domain.Project
 	err := q.QueryRow(ctx, `
-		SELECT id, project_key, COALESCE(name, ''), default_branch, global_threshold_percent, created_at, updated_at
+		SELECT id, project_key, COALESCE(name, ''), group_name, default_branch, global_threshold_percent, created_at, updated_at
 		FROM projects
 		WHERE project_key = $1
 	`, projectKey).Scan(
 		&p.ID,
 		&p.ProjectKey,
 		&p.Name,
+		&p.Group,
 		&p.DefaultBranch,
 		&p.GlobalThresholdPercent,
 		&p.CreatedAt,
@@ -48,13 +49,14 @@ func (r *ProjectRepository) GetByID(ctx context.Context, projectID string) (doma
 	q := getQuerier(ctx, r.pool)
 	var p domain.Project
 	err := q.QueryRow(ctx, `
-		SELECT id, project_key, COALESCE(name, ''), default_branch, global_threshold_percent, created_at, updated_at
+		SELECT id, project_key, COALESCE(name, ''), group_name, default_branch, global_threshold_percent, created_at, updated_at
 		FROM projects
 		WHERE id = $1
 	`, projectID).Scan(
 		&p.ID,
 		&p.ProjectKey,
 		&p.Name,
+		&p.Group,
 		&p.DefaultBranch,
 		&p.GlobalThresholdPercent,
 		&p.CreatedAt,
@@ -72,12 +74,13 @@ func (r *ProjectRepository) GetByID(ctx context.Context, projectID string) (doma
 func (r *ProjectRepository) Create(ctx context.Context, project domain.Project) (domain.Project, error) {
 	q := getQuerier(ctx, r.pool)
 	_, err := q.Exec(ctx, `
-		INSERT INTO projects (id, project_key, name, default_branch, global_threshold_percent, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO projects (id, project_key, name, group_name, default_branch, global_threshold_percent, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`,
 		project.ID,
 		project.ProjectKey,
 		project.Name,
+		project.Group,
 		project.DefaultBranch,
 		project.GlobalThresholdPercent,
 		project.CreatedAt,
@@ -99,7 +102,7 @@ func (r *ProjectRepository) List(ctx context.Context, page int, pageSize int) ([
 	}
 
 	rows, err := q.Query(ctx, `
-		SELECT id, project_key, COALESCE(name, ''), default_branch, global_threshold_percent, created_at, updated_at
+		SELECT id, project_key, COALESCE(name, ''), group_name, default_branch, global_threshold_percent, created_at, updated_at
 		FROM projects
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -116,6 +119,7 @@ func (r *ProjectRepository) List(ctx context.Context, page int, pageSize int) ([
 			&p.ID,
 			&p.ProjectKey,
 			&p.Name,
+			&p.Group,
 			&p.DefaultBranch,
 			&p.GlobalThresholdPercent,
 			&p.CreatedAt,

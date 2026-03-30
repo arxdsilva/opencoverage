@@ -1,18 +1,18 @@
 -- DEV SEED DATA
 -- Remove this file and the compose seed service before production deployment.
 
-INSERT INTO projects (id, project_key, name, default_branch, global_threshold_percent)
+INSERT INTO projects (id, project_key, name, group_name, default_branch, global_threshold_percent)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 'acme/coverage-api', 'coverage-api', 'main', 80.00),
-  ('22222222-2222-2222-2222-222222222222', 'acme/payments', 'payments', 'main', 85.00),
-  ('33333333-3333-3333-3333-333333333333', 'acme/webapp', 'webapp', 'main', 75.00),
-  ('44444444-4444-4444-4444-444444444444', 'acme/auth-service', 'auth-service', 'main', 82.50),
-  ('55555555-5555-5555-5555-555555555555', 'acme/notifications', 'notifications', 'main', 78.00),
-  ('66666666-6666-6666-6666-666666666666', 'acme/catalog', 'catalog', 'main', 81.00),
-  ('77777777-7777-7777-7777-777777777777', 'acme/orders', 'orders', 'main', 84.00),
-  ('88888888-8888-8888-8888-888888888888', 'acme/shipping', 'shipping', 'main', 79.50),
-  ('99999999-9999-9999-9999-999999999999', 'acme/analytics', 'analytics', 'main', 77.00),
-  ('aaaaaaaa-1111-1111-1111-111111111111', 'acme/search', 'search', 'main', 83.00)
+  ('11111111-1111-1111-1111-111111111111', 'acme/coverage-api', 'coverage-api', 'infrastructure/internal', 'main', 80.00),
+  ('22222222-2222-2222-2222-222222222222', 'acme/payments', 'payments', 'payments', 'main', 85.00),
+  ('33333333-3333-3333-3333-333333333333', 'acme/webapp', 'webapp', 'frontend', 'main', 75.00),
+  ('44444444-4444-4444-4444-444444444444', 'acme/auth-service', 'auth-service', 'auth', 'main', 82.50),
+  ('55555555-5555-5555-5555-555555555555', 'acme/notifications', 'notifications', 'notifications', 'main', 78.00),
+  ('66666666-6666-6666-6666-666666666666', 'acme/catalog', 'catalog', 'catalog', 'main', 81.00),
+  ('77777777-7777-7777-7777-777777777777', 'acme/orders', 'orders', 'orders', 'main', 84.00),
+  ('88888888-8888-8888-8888-888888888888', 'acme/shipping', 'shipping', 'fulfillment', 'main', 79.50),
+  ('99999999-9999-9999-9999-999999999999', 'acme/analytics', 'analytics', 'analytics', 'main', 77.00),
+  ('aaaaaaaa-1111-1111-1111-111111111111', 'acme/search', 'search', 'catalog', 'main', 83.00)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO coverage_runs (id, project_id, branch, commit_sha, author, trigger_type, run_timestamp, total_coverage_percent)

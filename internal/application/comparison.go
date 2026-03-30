@@ -6,6 +6,7 @@ type ProjectResponse struct {
 	ID                     string  `json:"id"`
 	ProjectKey             string  `json:"projectKey"`
 	Name                   string  `json:"name,omitempty"`
+	Group                  *string `json:"group,omitempty"`
 	DefaultBranch          string  `json:"defaultBranch"`
 	GlobalThresholdPercent float64 `json:"globalThresholdPercent"`
 	Created                bool    `json:"created"`

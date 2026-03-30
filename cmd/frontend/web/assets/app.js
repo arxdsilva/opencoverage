@@ -29,6 +29,7 @@ let selectedBranch = '';
 let availableBranches = [];
 let heatmapItems = [];
 let trendChart = null;
+let heatmapLayoutFrame = 0;
 
 refreshProjects.addEventListener('click', () => loadProjects());
 openHeatmap.addEventListener('click', () => {
@@ -46,10 +47,15 @@ branchSelector.addEventListener('change', async (e) => {
   selectedBranch = e.target.value;
   await loadLatestComparison(selectedProjectId);
 });
+window.addEventListener('resize', () => scheduleHeatmapLayout());
 
 function toggleHeatmapOverlay(open) {
   heatmapOverlay.classList.toggle('open', open);
   heatmapOverlay.setAttribute('aria-hidden', String(!open));
+
+  if (open) {
+    scheduleHeatmapLayout();
+  }
 }
 
 async function loadProjects() {
@@ -163,6 +169,58 @@ function renderHeatmapLoading() {
   heatmapGrid.innerHTML = '<p class="muted">Building heatmap...</p>';
 }
 
+function getGroupColorClass(groupName, groupItems) {
+  if (!groupItems || groupItems.length === 0) {
+    return 'neutral';
+  }
+
+  // Calculate average coverage for the group
+  let totalCoverage = 0;
+  let countWithCoverage = 0;
+  let upCount = 0;
+  let downCount = 0;
+  let passedCount = 0;
+  let failedCount = 0;
+
+  for (const item of groupItems) {
+    const current = Number(item.comparison?.currentTotalCoveragePercent);
+    if (Number.isFinite(current)) {
+      totalCoverage += current;
+      countWithCoverage++;
+    }
+
+    const delta = Number(item.comparison?.deltaPercent);
+    const threshold = item.comparison?.thresholdStatus;
+
+    if (Number.isFinite(delta) && delta >= 0) {
+      upCount++;
+    } else if (Number.isFinite(delta) && delta < 0) {
+      downCount++;
+    }
+
+    if (threshold === 'passed') {
+      passedCount++;
+    } else if (threshold === 'failed') {
+      failedCount++;
+    }
+  }
+
+  // Decision logic: Use threshold status if available, otherwise use delta trend
+  if (passedCount > failedCount) {
+    return 'up';
+  } else if (failedCount > passedCount) {
+    return 'down';
+  } else if (upCount > downCount) {
+    return 'up';
+  } else if (downCount > upCount) {
+    return 'down';
+  }
+
+  // Default based on average coverage
+  const avgCoverage = countWithCoverage > 0 ? totalCoverage / countWithCoverage : 0;
+  return avgCoverage >= 80 ? 'up' : 'down';
+}
+
 function renderHeatmap() {
   heatmapGrid.innerHTML = '';
 
@@ -176,19 +234,71 @@ function renderHeatmap() {
     return;
   }
 
-  const sorted = [...heatmapItems].sort((a, b) => {
-    const ac = Number(a.comparison?.currentTotalCoveragePercent);
-    const bc = Number(b.comparison?.currentTotalCoveragePercent);
-    return (Number.isFinite(bc) ? bc : -1) - (Number.isFinite(ac) ? ac : -1);
-  });
+  // Group items by project group
+  const grouped = {};
+  const ungroupedItems = [];
 
-  for (const item of sorted) {
-    const tile = buildHeatmapTile(item);
-    heatmapGrid.appendChild(tile);
+  for (const item of heatmapItems) {
+    const groupName = item.project.group || null;
+    if (groupName) {
+      if (!grouped[groupName]) {
+        grouped[groupName] = [];
+      }
+      grouped[groupName].push(item);
+    } else {
+      ungroupedItems.push(item);
+    }
   }
+
+  // Sort items within each group by coverage
+  const sortItems = (items) => {
+    return items.sort((a, b) => {
+      const ac = Number(a.comparison?.currentTotalCoveragePercent);
+      const bc = Number(b.comparison?.currentTotalCoveragePercent);
+      return (Number.isFinite(bc) ? bc : -1) - (Number.isFinite(ac) ? ac : -1);
+    });
+  };
+
+  const sections = Object.keys(grouped)
+    .sort()
+    .map((groupName) => ({
+      name: groupName,
+      items: sortItems(grouped[groupName]),
+    }));
+
+  if (ungroupedItems.length > 0) {
+    sections.push({
+      name: 'Ungrouped',
+      items: sortItems(ungroupedItems),
+    });
+  }
+
+  for (const section of sections) {
+    const groupSection = document.createElement('div');
+    const colorClass = getGroupColorClass(section.name, section.items);
+    groupSection.className = `heatmap-group heatmap-group-${colorClass}`;
+
+    const groupHeader = document.createElement('h4');
+    groupHeader.className = 'heatmap-group-header';
+    groupHeader.textContent = section.name;
+    groupSection.appendChild(groupHeader);
+
+    const groupGrid = document.createElement('div');
+    groupGrid.className = 'heatmap-group-grid';
+
+    for (const item of section.items) {
+      const tile = buildHeatmapTile(item, { compact: true });
+      groupGrid.appendChild(tile);
+    }
+
+    groupSection.appendChild(groupGrid);
+    heatmapGrid.appendChild(groupSection);
+  }
+
+  scheduleHeatmapLayout();
 }
 
-function buildHeatmapTile(item) {
+function buildHeatmapTile(item, options = {}) {
   const btn = document.createElement('button');
   const project = item.project;
   const name = project.name || project.projectKey;
@@ -196,13 +306,28 @@ function buildHeatmapTile(item) {
   const delta = Number(item.comparison?.deltaPercent);
   const threshold = item.comparison?.thresholdStatus;
   const thresholdValue = Number(item.comparison?.thresholdPercent);
+  const { compact = false } = options;
 
   const trendClass = heatTrendClass(current, delta, threshold);
   const size = tileSizeForCoverage(current);
+  const classNames = ['heat-tile', trendClass];
 
-  btn.className = `heat-tile ${trendClass} ${selectedProjectId === project.id ? 'selected' : ''}`;
-  btn.style.setProperty('--col-span', String(size.col));
-  btn.style.setProperty('--row-span', String(size.row));
+  if (compact) {
+    classNames.push('compact');
+  }
+  if (selectedProjectId === project.id) {
+    classNames.push('selected');
+  }
+
+  btn.className = classNames.join(' ');
+
+  if (compact) {
+    btn.style.removeProperty('--col-span');
+    btn.style.removeProperty('--row-span');
+  } else {
+    btn.style.setProperty('--col-span', String(size.col));
+    btn.style.setProperty('--row-span', String(size.row));
+  }
 
   const deltaText = Number.isFinite(delta) ? signedPct(delta) : '-';
   btn.innerHTML = `
@@ -230,6 +355,70 @@ function tileSizeForCoverage(current) {
   if (current >= 70) return { col: 4, row: 3 };
   if (current >= 60) return { col: 4, row: 2 };
   return { col: 3, row: 2 };
+}
+
+function scheduleHeatmapLayout() {
+  if (heatmapLayoutFrame !== 0) {
+    cancelAnimationFrame(heatmapLayoutFrame);
+  }
+
+  heatmapLayoutFrame = requestAnimationFrame(() => {
+    heatmapLayoutFrame = 0;
+    layoutHeatmapGroups();
+  });
+}
+
+function layoutHeatmapGroups() {
+  const groups = Array.from(heatmapGrid.querySelectorAll('.heatmap-group'));
+  if (groups.length === 0) {
+    heatmapGrid.style.removeProperty('--heatmap-group-columns');
+    heatmapGrid.style.removeProperty('--heatmap-group-rows');
+    return;
+  }
+
+  const width = heatmapGrid.clientWidth;
+  const height = heatmapGrid.clientHeight;
+  if (!width || !height) {
+    return;
+  }
+
+  const groupLayout = fitGrid(groups.length, width / Math.max(height, 1));
+  heatmapGrid.style.setProperty('--heatmap-group-columns', String(groupLayout.columns));
+  heatmapGrid.style.setProperty('--heatmap-group-rows', String(groupLayout.rows));
+
+  const remainder = groups.length % groupLayout.columns;
+
+  groups.forEach((group, index) => {
+    group.style.gridColumn = '';
+
+    if (remainder !== 0 && index === groups.length - 1) {
+      group.style.gridColumn = `span ${groupLayout.columns - remainder + 1}`;
+    }
+
+    const groupGrid = group.querySelector('.heatmap-group-grid');
+    if (!groupGrid) {
+      return;
+    }
+
+    const tiles = Array.from(groupGrid.querySelectorAll('.heat-tile'));
+    const groupWidth = groupGrid.clientWidth || group.clientWidth;
+    const groupHeight = groupGrid.clientHeight || group.clientHeight;
+    const tileLayout = fitGrid(tiles.length, groupWidth / Math.max(groupHeight, 1));
+
+    groupGrid.style.setProperty('--group-columns', String(tileLayout.columns));
+    groupGrid.style.setProperty('--group-rows', String(tileLayout.rows));
+  });
+}
+
+function fitGrid(itemCount, aspectRatio) {
+  if (itemCount <= 1) {
+    return { columns: 1, rows: 1 };
+  }
+
+  const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
+  const columns = Math.max(1, Math.min(itemCount, Math.ceil(Math.sqrt(itemCount * safeAspectRatio))));
+  const rows = Math.max(1, Math.ceil(itemCount / columns));
+  return { columns, rows };
 }
 
 async function loadBranches(projectId) {

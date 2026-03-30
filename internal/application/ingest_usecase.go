@@ -14,6 +14,7 @@ import (
 type IngestCoverageRunInput struct {
 	ProjectKey           string               `json:"projectKey"`
 	ProjectName          string               `json:"projectName"`
+	ProjectGroup         *string              `json:"projectGroup,omitempty"`
 	DefaultBranch        string               `json:"defaultBranch"`
 	Branch               string               `json:"branch"`
 	CommitSHA            string               `json:"commitSha"`
@@ -178,6 +179,7 @@ func (uc *IngestCoverageRunUseCase) resolveOrCreateProject(ctx context.Context, 
 		ID:                     uc.ids.NewID(),
 		ProjectKey:             in.ProjectKey,
 		Name:                   in.ProjectName,
+		Group:                  in.ProjectGroup,
 		DefaultBranch:          defaultBranch,
 		GlobalThresholdPercent: domain.DefaultThresholdPercent,
 		CreatedAt:              now,
