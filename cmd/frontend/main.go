@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -18,13 +20,15 @@ import (
 var embeddedFrontend embed.FS
 
 type config struct {
-	Addr         string
-	APIBaseURL   string
-	APIKeyHeader string
-	APIKeySecret string
-	AppVersion   string
-	LatestVersion string
-	UpgradeURL   string
+	Addr            string
+	APIBaseURL      string
+	APIKeyHeader    string
+	APIKeySecret    string
+	AppVersion      string
+	LatestVersion   string
+	AppCommitSHA    string
+	LatestCommitSHA string
+	UpgradeURL      string
 }
 
 func main() {
@@ -69,15 +73,56 @@ func main() {
 }
 
 func loadConfig() config {
-	return config{
-		Addr:         envOrDefault("FRONTEND_ADDR", ":8090"),
-		APIBaseURL:   strings.TrimRight(envOrDefault("API_BASE_URL", "http://localhost:8080"), "/"),
-		APIKeyHeader: envOrDefault("API_KEY_HEADER", "X-API-Key"),
-		APIKeySecret: envOrDefault("API_KEY_SECRET", "dev-local-key"),
-		AppVersion:   envOrDefault("APP_VERSION", "dev"),
-		LatestVersion: strings.TrimSpace(os.Getenv("APP_LATEST_VERSION")),
-		UpgradeURL:   envOrDefault("APP_UPGRADE_URL", "https://github.com/arxdsilva/opencoverage/releases"),
+	cfg := config{
+		Addr:            envOrDefault("FRONTEND_ADDR", ":8090"),
+		APIBaseURL:      strings.TrimRight(envOrDefault("API_BASE_URL", "http://localhost:8080"), "/"),
+		APIKeyHeader:    envOrDefault("API_KEY_HEADER", "X-API-Key"),
+		APIKeySecret:    envOrDefault("API_KEY_SECRET", "dev-local-key"),
+		AppVersion:      strings.TrimSpace(os.Getenv("APP_VERSION")),
+		LatestVersion:   strings.TrimSpace(os.Getenv("APP_LATEST_VERSION")),
+		AppCommitSHA:    strings.TrimSpace(os.Getenv("APP_COMMIT_SHA")),
+		LatestCommitSHA: strings.TrimSpace(os.Getenv("APP_LATEST_COMMIT_SHA")),
+		UpgradeURL:      envOrDefault("APP_UPGRADE_URL", "https://github.com/arxdsilva/opencoverage/releases"),
 	}
+
+	applyBuildVersionFallbacks(&cfg)
+	return cfg
+}
+
+func applyBuildVersionFallbacks(cfg *config) {
+	if cfg == nil {
+		return
+	}
+
+	if buildInfo, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range buildInfo.Settings {
+			if setting.Key == "vcs.revision" && cfg.AppCommitSHA == "" {
+				cfg.AppCommitSHA = setting.Value
+			}
+			if setting.Key == "vcs.tag" && cfg.AppVersion == "" {
+				cfg.AppVersion = setting.Value
+			}
+		}
+
+		if cfg.AppVersion == "" && buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
+			cfg.AppVersion = buildInfo.Main.Version
+		}
+	}
+
+	if cfg.AppVersion == "" {
+		if cfg.AppCommitSHA == "" {
+			cfg.AppCommitSHA = resolveGitCommitSHA()
+		}
+		cfg.AppVersion = commitLabel(cfg.AppCommitSHA)
+	}
+}
+
+func resolveGitCommitSHA() string {
+	out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func envOrDefault(key, fallback string) string {
@@ -130,6 +175,7 @@ type appMetaResponse struct {
 	LatestVersion  string `json:"latestVersion,omitempty"`
 	UpgradeURL     string `json:"upgradeUrl,omitempty"`
 	HasUpgrade     bool   `json:"hasUpgrade"`
+	Mode           string `json:"mode"`
 }
 
 func appMetaHandler(cfg config) http.HandlerFunc {
@@ -139,13 +185,50 @@ func appMetaHandler(cfg config) http.HandlerFunc {
 			return
 		}
 
+		currentVersion, latestVersion, hasUpgrade, mode := resolveAppVersionInfo(cfg)
+
 		writeJSON(w, http.StatusOK, appMetaResponse{
-			CurrentVersion: cfg.AppVersion,
-			LatestVersion:  cfg.LatestVersion,
+			CurrentVersion: currentVersion,
+			LatestVersion:  latestVersion,
 			UpgradeURL:     cfg.UpgradeURL,
-			HasUpgrade:     isNewerVersion(cfg.LatestVersion, cfg.AppVersion),
+			HasUpgrade:     hasUpgrade,
+			Mode:           mode,
 		})
 	}
+}
+
+func resolveAppVersionInfo(cfg config) (currentVersion string, latestVersion string, hasUpgrade bool, mode string) {
+	if cfg.LatestVersion != "" {
+		current := cfg.AppVersion
+		if current == "" {
+			current = "v-unknown"
+		}
+		return current, cfg.LatestVersion, isNewerVersion(cfg.LatestVersion, current), "release"
+	}
+
+	current := commitLabel(cfg.AppCommitSHA)
+	if current == "v-unknown" && cfg.AppVersion != "" {
+		current = cfg.AppVersion
+	}
+	latest := commitLabel(cfg.LatestCommitSHA)
+
+	hasUpdateByCommit := cfg.AppCommitSHA != "" && cfg.LatestCommitSHA != "" && !strings.EqualFold(cfg.AppCommitSHA, cfg.LatestCommitSHA)
+	if latest == "v-unknown" {
+		latest = ""
+	}
+
+	return current, latest, hasUpdateByCommit, "commit"
+}
+
+func commitLabel(commit string) string {
+	trimmed := strings.TrimSpace(commit)
+	if trimmed == "" {
+		return "v-unknown"
+	}
+	if len(trimmed) > 7 {
+		trimmed = trimmed[:7]
+	}
+	return "v-" + trimmed
 }
 
 func isNewerVersion(latest, current string) bool {

@@ -23,6 +23,8 @@ const branchSelector = document.getElementById('branchSelector');
 const trendSubtitle = document.getElementById('trendSubtitle');
 const appShell = document.getElementById('appShell');
 const toggleSidebar = document.getElementById('toggleSidebar');
+const appVersion = document.getElementById('appVersion');
+const upgradeLink = document.getElementById('upgradeLink');
 
 let projects = [];
 let allProjects = [];
@@ -59,6 +61,7 @@ branchSelector.addEventListener('change', async (e) => {
 window.addEventListener('resize', () => scheduleHeatmapLayout());
 
 initializeSidebarState();
+loadAppMeta();
 
 function toggleHeatmapOverlay(open) {
   heatmapOverlay.classList.toggle('open', open);
@@ -81,6 +84,35 @@ function setSidebarCollapsed(collapsed) {
   toggleSidebar.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
   toggleSidebar.setAttribute('aria-expanded', String(!collapsed));
   window.localStorage.setItem(sidebarCollapsedKey, String(collapsed));
+}
+
+async function loadAppMeta() {
+  if (!appVersion || !upgradeLink) return;
+
+  appVersion.textContent = 'v-unknown';
+  upgradeLink.hidden = true;
+
+  try {
+    const res = await fetch('/api/app-meta');
+    if (!res.ok) throw new Error(`failed to load app metadata (${res.status})`);
+
+    const data = await res.json();
+    appVersion.textContent = data.currentVersion || 'v-unknown';
+
+    if (data.hasUpgrade && data.upgradeUrl) {
+      upgradeLink.href = data.upgradeUrl;
+      upgradeLink.hidden = false;
+      const labelTarget = data.latestVersion || 'newer version';
+      upgradeLink.setAttribute('aria-label', `Upgrade available (${labelTarget})`);
+      upgradeLink.setAttribute('title', `Upgrade available: ${labelTarget}`);
+    } else {
+      upgradeLink.hidden = true;
+    }
+  } catch (err) {
+    console.error('Error loading app metadata:', err);
+    appVersion.textContent = 'v-unknown';
+    upgradeLink.hidden = true;
+  }
 }
 
 async function loadProjects() {
