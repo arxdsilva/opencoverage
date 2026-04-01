@@ -163,9 +163,23 @@
             <div class="heatmap-overlay-head">
               <div class="table-head heatmap-head">
                 <h3>Projects Heatmap</h3>
-                <p class="muted">All projects. Heatmap compares the last two commits on each project's default branch. Tile color = threshold status (green passed, red failed). Delta arrow = trend direction.</p>
+                <p class="muted">All projects. Tile color maps delta coverage from -3% (red) to +3% (green).</p>
               </div>
-              <button id="closeHeatmap" class="btn">Close</button>
+              <div class="heatmap-overlay-tools">
+                <div class="heatmap-scale" aria-label="Coverage delta color scale">
+                  <p class="heatmap-scale-title">Delta scale</p>
+                  <div class="heatmap-scale-steps" role="presentation">
+                    <span class="scale-step delta-neg-3">-3%</span>
+                    <span class="scale-step delta-neg-2">-2%</span>
+                    <span class="scale-step delta-neg-1">-1%</span>
+                    <span class="scale-step delta-zero">0%</span>
+                    <span class="scale-step delta-pos-1">+1%</span>
+                    <span class="scale-step delta-pos-2">+2%</span>
+                    <span class="scale-step delta-pos-3">+3%</span>
+                  </div>
+                </div>
+                <button id="closeHeatmap" class="btn">Close</button>
+              </div>
             </div>
             <div id="heatmapGrid" class="heatmap-grid heatmap-overlay-grid"></div>
           </article>

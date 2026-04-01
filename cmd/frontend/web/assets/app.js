@@ -214,16 +214,8 @@ async function loadHeatmap() {
   const items = await Promise.all(
     sourceProjects.map(async (project) => {
       try {
-        const defaultBranch = project.defaultBranch || 'main';
-        const url = new URL(`/api/projects/${project.id}/coverage-runs`, window.location.origin);
-        url.searchParams.set('branch', defaultBranch);
-        url.searchParams.set('page', '1');
-        url.searchParams.set('pageSize', '2');
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error(`failed to load default branch runs (${res.status})`);
-        const data = await res.json();
-        const runs = data.items || [];
-        return { project, comparison: buildHeatmapComparisonFromDefaultBranch(runs, project) };
+        const comparison = await loadHeatmapComparison(project);
+        return { project, comparison };
       } catch (err) {
         return { project, comparison: null, error: err.message };
       }
@@ -232,6 +224,60 @@ async function loadHeatmap() {
 
   heatmapItems = items;
   renderHeatmap();
+}
+
+async function loadHeatmapComparison(project) {
+  // Prefer server comparison logic so heatmap uses the same baseline rules as the detail view.
+  try {
+    const compareRes = await fetch(`/api/projects/${project.id}/coverage-runs/latest-comparison`);
+    if (compareRes.ok) {
+      const compareData = await compareRes.json();
+      const comparison = normalizeHeatmapComparison(compareData?.comparison);
+      if (comparison) {
+        return comparison;
+      }
+    }
+  } catch (err) {
+    // Fall back below.
+  }
+
+  const defaultBranch = project.defaultBranch || 'main';
+  const runsUrl = new URL(`/api/projects/${project.id}/coverage-runs`, window.location.origin);
+  runsUrl.searchParams.set('branch', defaultBranch);
+  runsUrl.searchParams.set('page', '1');
+  runsUrl.searchParams.set('pageSize', '2');
+  const runsRes = await fetch(runsUrl.toString());
+  if (!runsRes.ok) throw new Error(`failed to load default branch runs (${runsRes.status})`);
+  const runsData = await runsRes.json();
+  const fallbackComparison = buildHeatmapComparisonFromDefaultBranch(runsData.items || [], project);
+  return normalizeHeatmapComparison(fallbackComparison);
+}
+
+function normalizeHeatmapComparison(comparison) {
+  if (!comparison) {
+    return null;
+  }
+
+  const current = Number(comparison.currentTotalCoveragePercent);
+  if (!Number.isFinite(current)) {
+    return null;
+  }
+
+  const previousValue = Number(comparison.previousTotalCoveragePercent);
+  const thresholdValue = Number(comparison.thresholdPercent);
+  let deltaValue = Number(comparison.deltaPercent);
+
+  if (!Number.isFinite(deltaValue) && Number.isFinite(previousValue)) {
+    deltaValue = current - previousValue;
+  }
+
+  return {
+    ...comparison,
+    currentTotalCoveragePercent: current,
+    previousTotalCoveragePercent: Number.isFinite(previousValue) ? previousValue : null,
+    deltaPercent: Number.isFinite(deltaValue) ? deltaValue : null,
+    thresholdPercent: Number.isFinite(thresholdValue) ? thresholdValue : null,
+  };
 }
 
 function buildHeatmapComparisonFromDefaultBranch(runs, project) {
@@ -392,12 +438,12 @@ function buildHeatmapTile(item, options = {}) {
   const project = item.project;
   const name = project.name || project.projectKey;
   const current = Number(item.comparison?.currentTotalCoveragePercent);
-  const delta = typeof item.comparison?.deltaPercent === 'number' ? item.comparison.deltaPercent : null;
+  const delta = Number(item.comparison?.deltaPercent);
   const threshold = item.comparison?.thresholdStatus;
   const thresholdValue = Number(item.comparison?.thresholdPercent);
   const { compact = false } = options;
 
-  const trendClass = heatTileStatusClass(current, threshold);
+  const trendClass = heatDeltaClass(delta);
   const size = tileSizeForCoverage(current);
   const classNames = ['heat-tile', trendClass];
 
@@ -431,11 +477,15 @@ function buildHeatmapTile(item, options = {}) {
   return btn;
 }
 
-function heatTileStatusClass(current, threshold) {
-  if (!Number.isFinite(current)) return 'neutral';
-  if (threshold === 'passed') return 'up';
-  if (threshold === 'failed') return 'down';
-  return 'neutral';
+function heatDeltaClass(delta) {
+  if (!Number.isFinite(delta)) return 'delta-zero';
+
+  const clamped = Math.max(-3, Math.min(3, delta));
+  const step = Math.round(clamped);
+
+  if (step > 0) return `delta-pos-${step}`;
+  if (step < 0) return `delta-neg-${Math.abs(step)}`;
+  return 'delta-zero';
 }
 
 function heatDeltaArrow(delta) {
