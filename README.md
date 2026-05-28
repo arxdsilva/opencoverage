@@ -176,6 +176,39 @@ Install CLI from GitHub:
 go install github.com/arxdsilva/opencoverage/cmd/coveragecli@latest
 ```
 
+### Upload Vitest Coverage Summary (npm)
+
+Generate Vitest coverage summary:
+
+```bash
+npx vitest run --coverage --coverage.reporter=lcov --coverage.reporter=json-summary
+```
+
+Upload `coverage/coverage-summary.json` using the CLI:
+
+```bash
+go run ./cmd/coveragecli npm-upload \
+  -vitest-summary coverage/coverage-summary.json \
+  -api-url http://localhost:8080/v1/coverage-runs \
+  -api-key dev-local-key \
+  -project-key github.com/example/frontend-repo \
+  -project-name frontend-repo \
+  -project-group frontend \
+  -default-branch main \
+  -branch main \
+  -commit-sha abc123 \
+  -author alice \
+  -trigger-type push
+```
+
+Useful options:
+
+- `-metric lines|statements|functions|branches` (default `lines`)
+- `-group-by dir|file` (default `dir`)
+- `-include-glob` and `-exclude-glob` (repeatable)
+- `-path-strip-prefix` for deterministic path normalization
+- `-dry-run` and `-out <payload.json>` to inspect payload without upload
+
 ## Architecture
 
 This project follows Hexagonal Architecture (ports and adapters):
