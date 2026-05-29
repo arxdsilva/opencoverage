@@ -9,16 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/arxdsilva/opencoverage/internal/adapters/auth"
 	httpadapter "github.com/arxdsilva/opencoverage/internal/adapters/http"
-	"github.com/arxdsilva/opencoverage/internal/adapters/postgres"
-	"github.com/arxdsilva/opencoverage/internal/application"
-	"github.com/arxdsilva/opencoverage/internal/platform/clock"
+	"github.com/arxdsilva/opencoverage/internal/platform/bootstrap"
 	"github.com/arxdsilva/opencoverage/internal/platform/config"
-	"github.com/arxdsilva/opencoverage/internal/platform/idgen"
-	"github.com/arxdsilva/opencoverage/internal/platform/migrations"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -36,62 +29,28 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	app, err := bootstrap.New(ctx, cfg)
 	if err != nil {
-		slog.Error("startup_failed", "stage", "create_db_pool", "error", err)
+		slog.Error("startup_failed", "stage", "bootstrap", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
-
-	if err := migrations.Up(ctx, cfg.DatabaseURL, cfg.MigrationsDir); err != nil {
-		slog.Error("startup_failed", "stage", "run_migrations", "error", err)
-		os.Exit(1)
-	}
-
-	if err := pool.Ping(ctx); err != nil {
-		slog.Error("startup_failed", "stage", "ping_db", "error", err)
-		os.Exit(1)
-	}
-
-	projectRepo := postgres.NewProjectRepository(pool)
-	runRepo := postgres.NewCoverageRunRepository(pool)
-	packageRepo := postgres.NewPackageCoverageRepository(pool)
-	integrationRunRepo := postgres.NewIntegrationTestRunRepository(pool)
-	integrationSpecRepo := postgres.NewIntegrationSpecResultRepository(pool)
-	txManager := postgres.NewTxManager(pool)
-	authenticator := auth.NewEnvAPIKeyAuthenticator(cfg.APIKeySecret)
-
-	clockAdapter := clock.NewSystemClock()
-	idGenerator := idgen.NewUUIDGenerator()
-
-	ingestUC := application.NewIngestCoverageRunUseCase(projectRepo, runRepo, packageRepo, txManager, idGenerator, clockAdapter)
-	ingestIntegrationUC := application.NewIngestIntegrationRunUseCase(projectRepo, integrationRunRepo, integrationSpecRepo, txManager, idGenerator, clockAdapter)
-	listProjectsUC := application.NewListProjectsUseCase(projectRepo)
-	getProjectUC := application.NewGetProjectUseCase(projectRepo)
-	listRunsUC := application.NewListCoverageRunsUseCase(runRepo)
-	listIntegrationRunsUC := application.NewListIntegrationRunsUseCase(integrationRunRepo)
-	latestComparisonUC := application.NewGetLatestComparisonUseCase(projectRepo, runRepo, packageRepo)
-	latestIntegrationComparisonUC := application.NewGetLatestIntegrationComparisonUseCase(projectRepo, integrationRunRepo, integrationSpecRepo)
-	getIntegrationRunUC := application.NewGetIntegrationRunUseCase(integrationRunRepo, integrationSpecRepo)
-	getIntegrationHeatmapUC := application.NewGetIntegrationHeatmapUseCase(integrationRunRepo)
-	listBranchesUC := application.NewListBranchesUseCase(runRepo)
-	listContributorsUC := application.NewListContributorsUseCase(projectRepo, runRepo)
+	defer app.Close()
 
 	handler := httpadapter.NewHandler(
-		ingestUC,
-		ingestIntegrationUC,
-		listProjectsUC,
-		getProjectUC,
-		listRunsUC,
-		listIntegrationRunsUC,
-		latestComparisonUC,
-		latestIntegrationComparisonUC,
-		getIntegrationRunUC,
-		getIntegrationHeatmapUC,
-		listBranchesUC,
-		listContributorsUC,
+		app.IngestCoverageRun,
+		app.IngestIntegrationRun,
+		app.ListProjects,
+		app.GetProject,
+		app.ListCoverageRuns,
+		app.ListIntegrationRuns,
+		app.GetLatestComparison,
+		app.GetLatestIntegrationCompare,
+		app.GetIntegrationRun,
+		app.GetIntegrationHeatmap,
+		app.ListBranches,
+		app.ListContributors,
 	)
-	router := httpadapter.NewRouter(handler, authenticator, cfg.APIKeyHeader)
+	router := httpadapter.NewRouter(handler, app.Authenticator, cfg.APIKeyHeader)
 
 	server := &http.Server{
 		Addr:         cfg.ServerAddr,

@@ -79,6 +79,23 @@ export API_KEY_SECRET="dev-local-key"
 go run ./cmd/api
 ```
 
+Run MCP server locally:
+
+```bash
+export DATABASE_URL="postgres://coverage:coverage@localhost:5432/coverage?sslmode=disable"
+export MCP_SERVER_NAME="opencoverage"
+export MCP_SERVER_VERSION="dev"
+go run ./cmd/mcp
+```
+
+Optional MCP settings:
+
+- `MCP_TRANSPORT` (default `stdio`)
+- `MCP_ENABLE_PROMPTS` (default `true`)
+- `MCP_ENABLE_WRITE_TOOLS` (default `false`)
+- `MCP_MAX_PAGE_SIZE` (default `100`)
+- `MCP_DEFAULT_RUNS_LIMIT` (default `20`)
+
 Run frontend locally:
 
 ```bash
