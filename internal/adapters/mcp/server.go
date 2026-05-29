@@ -131,7 +131,7 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 	s.AddTool(mcp.NewTool("list_projects",
 		mcp.WithDescription("List projects in OpenCoverage."),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
-		mcp.WithInteger("pageSize", mcp.Description("Number of projects per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
+		mcp.WithInteger("pageSize", mcp.Description("Number of projects per page."), mcp.Min(1), mcp.Max(a.pageSizeLimit())),
 	), a.withToolLogging("list_projects", a.handleListProjects))
 
 	s.AddTool(mcp.NewTool("get_project",
@@ -151,7 +151,7 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 		mcp.WithString("from", mcp.Description("Optional RFC3339 lower time bound.")),
 		mcp.WithString("to", mcp.Description("Optional RFC3339 upper time bound.")),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
-		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
+		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.pageSizeLimit())),
 	), a.withToolLogging("list_coverage_runs", a.handleListCoverageRuns))
 
 	s.AddTool(mcp.NewTool("get_latest_coverage_comparison",
@@ -175,7 +175,7 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 		mcp.WithString("from", mcp.Description("Optional RFC3339 lower time bound.")),
 		mcp.WithString("to", mcp.Description("Optional RFC3339 upper time bound.")),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
-		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
+		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.pageSizeLimit())),
 	), a.withToolLogging("list_integration_runs", a.handleListIntegrationRuns))
 
 	s.AddTool(mcp.NewTool("get_latest_integration_comparison",

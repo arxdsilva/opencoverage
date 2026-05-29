@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	maxContributorLimit = 25
-	maxRunsPerProject   = 30
+	applicationMaxPageSize = 100
+	maxContributorLimit    = 25
+	maxRunsPerProject      = 30
 )
 
 // handleListProjects returns a paginated list of projects.
@@ -423,10 +424,18 @@ func (a *Adapter) normalizePageSize(pageSize int) int {
 	if pageSize <= 0 {
 		return defaultListPageSize
 	}
-	if pageSize > a.cfg.MCPMaxPageSize {
-		return a.cfg.MCPMaxPageSize
+	limit := a.pageSizeLimit()
+	if pageSize > limit {
+		return limit
 	}
 	return pageSize
+}
+
+func (a *Adapter) pageSizeLimit() int {
+	if a.cfg.MCPMaxPageSize <= 0 || a.cfg.MCPMaxPageSize > applicationMaxPageSize {
+		return applicationMaxPageSize
+	}
+	return a.cfg.MCPMaxPageSize
 }
 
 func (a *Adapter) normalizePage(page int) int {

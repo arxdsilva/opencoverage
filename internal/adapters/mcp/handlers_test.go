@@ -984,6 +984,9 @@ func TestHandlerHelpers(t *testing.T) {
 	if got := a.normalizePageSize(10); got != 10 {
 		t.Fatalf("expected unchanged page size, got %d", got)
 	}
+	if got := a.pageSizeLimit(); got != 50 {
+		t.Fatalf("expected configured page size limit, got %d", got)
+	}
 	if got := a.defaultRunsLimit(); got != 15 {
 		t.Fatalf("expected configured runs limit, got %d", got)
 	}
@@ -1017,6 +1020,14 @@ func TestHandlerHelpers(t *testing.T) {
 	cappedDefaultAdapter := &Adapter{cfg: config.Config{MCPDefaultRunsLimit: 200}}
 	if got := cappedDefaultAdapter.normalizeRunsPerProject(0); got != maxRunsPerProject {
 		t.Fatalf("expected capped default runs per project, got %d", got)
+	}
+
+	overLimitAdapter := newTestAdapter(config.Config{MCPMaxPageSize: 500, MCPDefaultRunsLimit: 15}, Services{}, nil)
+	if got := overLimitAdapter.pageSizeLimit(); got != applicationMaxPageSize {
+		t.Fatalf("expected app page size limit, got %d", got)
+	}
+	if got := overLimitAdapter.normalizePageSize(500); got != applicationMaxPageSize {
+		t.Fatalf("expected capped page size, got %d", got)
 	}
 
 	t.Run("authenticate missing authenticator", func(t *testing.T) {

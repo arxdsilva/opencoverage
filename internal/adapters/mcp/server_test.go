@@ -182,7 +182,7 @@ func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
 		MCPServerName:       "opencoverage",
 		MCPServerVersion:    "test",
 		MCPTransport:        "stdio",
-		MCPMaxPageSize:      100,
+		MCPMaxPageSize:      500,
 		MCPDefaultRunsLimit: 20,
 		MCPEnableWriteTools: true,
 	}
@@ -205,6 +205,27 @@ func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
 	}
 	if !slices.Contains(coverageRequired, "projectKey") || !slices.Contains(coverageRequired, "packages") {
 		t.Fatalf("expected coverage payload required fields to include projectKey and packages, got %#v", coverageRequired)
+	}
+	coveragePageSize, ok := s.GetTool("list_projects").Tool.InputSchema.Properties["pageSize"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected list_projects pageSize schema to be object, got %T", s.GetTool("list_projects").Tool.InputSchema.Properties["pageSize"])
+	}
+	if coveragePageSize["maximum"] != float64(applicationMaxPageSize) && coveragePageSize["maximum"] != applicationMaxPageSize {
+		t.Fatalf("expected pageSize maximum to be %d, got %#v", applicationMaxPageSize, coveragePageSize["maximum"])
+	}
+	coverageRunsPageSize, ok := s.GetTool("list_coverage_runs").Tool.InputSchema.Properties["pageSize"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected list_coverage_runs pageSize schema to be object, got %T", s.GetTool("list_coverage_runs").Tool.InputSchema.Properties["pageSize"])
+	}
+	if coverageRunsPageSize["maximum"] != float64(applicationMaxPageSize) && coverageRunsPageSize["maximum"] != applicationMaxPageSize {
+		t.Fatalf("expected coverage runs pageSize maximum to be %d, got %#v", applicationMaxPageSize, coverageRunsPageSize["maximum"])
+	}
+	integrationRunsPageSize, ok := s.GetTool("list_integration_runs").Tool.InputSchema.Properties["pageSize"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected list_integration_runs pageSize schema to be object, got %T", s.GetTool("list_integration_runs").Tool.InputSchema.Properties["pageSize"])
+	}
+	if integrationRunsPageSize["maximum"] != float64(applicationMaxPageSize) && integrationRunsPageSize["maximum"] != applicationMaxPageSize {
+		t.Fatalf("expected integration runs pageSize maximum to be %d, got %#v", applicationMaxPageSize, integrationRunsPageSize["maximum"])
 	}
 
 	integrationTool := s.GetTool("ingest_integration_run")
