@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 
 	mcpadapter "github.com/arxdsilva/opencoverage/internal/adapters/mcp"
 	"github.com/arxdsilva/opencoverage/internal/platform/bootstrap"
@@ -12,15 +13,33 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
+func parseMCPLogLevel(level string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	case "info":
+		fallthrough
+	default:
+		return slog.LevelInfo
+	}
+}
 
+func main() {
 	cfg, err := config.Load()
 	if err != nil {
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+		slog.SetDefault(logger)
 		slog.Error("startup_failed", "stage", "load_config", "error", err)
 		os.Exit(1)
 	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: parseMCPLogLevel(cfg.MCPLogLevel)}))
+	slog.SetDefault(logger)
+
 	if err := cfg.ValidateMCP(); err != nil {
 		slog.Error("startup_failed", "stage", "validate_config", "error", err)
 		os.Exit(1)

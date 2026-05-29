@@ -9,36 +9,38 @@ import (
 )
 
 type Config struct {
-	ServerAddr      string
-	DatabaseURL     string
-	MigrationsDir   string
-	APIKeyHeader    string
-	APIKeySecret    string
-	ShutdownTimeout time.Duration
-	MCPServerName   string
-	MCPServerVersion string
-	MCPTransport    string
+	ServerAddr          string
+	DatabaseURL         string
+	MigrationsDir       string
+	APIKeyHeader        string
+	APIKeySecret        string
+	ShutdownTimeout     time.Duration
+	MCPServerName       string
+	MCPServerVersion    string
+	MCPTransport        string
+	MCPLogLevel         string
 	MCPEnableWriteTools bool
-	MCPMaxPageSize  int
+	MCPMaxPageSize      int
 	MCPDefaultRunsLimit int
-	MCPEnablePrompts bool
+	MCPEnablePrompts    bool
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		ServerAddr:      getEnv("SERVER_ADDR", ":8080"),
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
-		MigrationsDir:   getEnv("MIGRATIONS_DIR", "./migrations"),
-		APIKeyHeader:    getEnv("API_KEY_HEADER", "X-API-Key"),
-		APIKeySecret:    os.Getenv("API_KEY_SECRET"),
-		ShutdownTimeout: getEnvDuration("SHUTDOWN_TIMEOUT_SECONDS", 10),
-		MCPServerName:   getEnv("MCP_SERVER_NAME", "opencoverage"),
-		MCPServerVersion: getEnv("MCP_SERVER_VERSION", "dev"),
-		MCPTransport:    getEnv("MCP_TRANSPORT", "stdio"),
+		ServerAddr:          getEnv("SERVER_ADDR", ":8080"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		MigrationsDir:       getEnv("MIGRATIONS_DIR", "./migrations"),
+		APIKeyHeader:        getEnv("API_KEY_HEADER", "X-API-Key"),
+		APIKeySecret:        os.Getenv("API_KEY_SECRET"),
+		ShutdownTimeout:     getEnvDuration("SHUTDOWN_TIMEOUT_SECONDS", 10),
+		MCPServerName:       getEnv("MCP_SERVER_NAME", "opencoverage"),
+		MCPServerVersion:    getEnv("MCP_SERVER_VERSION", "dev"),
+		MCPTransport:        getEnv("MCP_TRANSPORT", "stdio"),
+		MCPLogLevel:         getEnv("MCP_LOG_LEVEL", "info"),
 		MCPEnableWriteTools: getEnvBool("MCP_ENABLE_WRITE_TOOLS", false),
-		MCPMaxPageSize:  getEnvInt("MCP_MAX_PAGE_SIZE", 100),
+		MCPMaxPageSize:      getEnvInt("MCP_MAX_PAGE_SIZE", 100),
 		MCPDefaultRunsLimit: getEnvInt("MCP_DEFAULT_RUNS_LIMIT", 20),
-		MCPEnablePrompts: getEnvBool("MCP_ENABLE_PROMPTS", true),
+		MCPEnablePrompts:    getEnvBool("MCP_ENABLE_PROMPTS", true),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -122,6 +124,9 @@ func (c Config) ValidateMCP() error {
 	}
 	if c.MCPTransport != "stdio" {
 		return fmt.Errorf("unsupported mcp transport %q", c.MCPTransport)
+	}
+	if c.MCPLogLevel != "debug" && c.MCPLogLevel != "info" && c.MCPLogLevel != "warn" && c.MCPLogLevel != "error" {
+		return fmt.Errorf("unsupported mcp log level %q", c.MCPLogLevel)
 	}
 	if c.MCPMaxPageSize <= 0 {
 		return fmt.Errorf("mcp max page size must be positive")
