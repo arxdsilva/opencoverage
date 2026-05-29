@@ -47,7 +47,7 @@ func main() {
 		GetIntegrationHeatmap:       app.GetIntegrationHeatmap,
 		IngestCoverageRun:           app.IngestCoverageRun,
 		IngestIntegrationRun:        app.IngestIntegrationRun,
-	})
+	}, app.Authenticator)
 
 	slog.Info("mcp_server_starting", "name", cfg.MCPServerName, "version", cfg.MCPServerVersion, "transport", cfg.MCPTransport)
 	if err := server.ServeStdio(mcpServer); err != nil {

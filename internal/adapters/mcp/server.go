@@ -17,15 +17,15 @@ import (
 )
 
 const (
-	resourceProjects                  = "opencoverage://projects"
-	resourceIntegrationHeatmap        = "opencoverage://integration/heatmap"
-	resourceProjectTemplate           = "opencoverage://projects/{projectId}"
-	resourceProjectCoverageTemplate   = "opencoverage://projects/{projectId}/coverage/latest"
-	resourceProjectIntegrationTemplate = "opencoverage://projects/{projectId}/integration/latest"
+	resourceProjects                    = "opencoverage://projects"
+	resourceIntegrationHeatmap          = "opencoverage://integration/heatmap"
+	resourceProjectTemplate             = "opencoverage://projects/{projectId}"
+	resourceProjectCoverageTemplate     = "opencoverage://projects/{projectId}/coverage/latest"
+	resourceProjectIntegrationTemplate  = "opencoverage://projects/{projectId}/integration/latest"
 	resourceProjectContributorsTemplate = "opencoverage://projects/{projectId}/contributors"
-	jsonMIMEType                      = "application/json"
-	defaultListPageSize               = 20
-	defaultContributorLimit           = 10
+	jsonMIMEType                        = "application/json"
+	defaultListPageSize                 = 20
+	defaultContributorLimit             = 10
 )
 
 type ListProjectsExecutor interface {
@@ -92,8 +92,9 @@ type Services struct {
 }
 
 type Adapter struct {
-	cfg      config.Config
-	services Services
+	cfg           config.Config
+	services      Services
+	authenticator application.APIKeyAuthenticator
 }
 
 type coverageComparisonEnvelope struct {
@@ -103,7 +104,7 @@ type coverageComparisonEnvelope struct {
 	Packages   []application.PackageComparisonResponse `json:"packages"`
 }
 
-func NewServer(cfg config.Config, services Services) *server.MCPServer {
+func NewServer(cfg config.Config, services Services, authenticator application.APIKeyAuthenticator) *server.MCPServer {
 	opts := []server.ServerOption{
 		server.WithRecovery(),
 		server.WithToolCapabilities(false),
@@ -115,7 +116,7 @@ func NewServer(cfg config.Config, services Services) *server.MCPServer {
 	}
 
 	s := server.NewMCPServer(cfg.MCPServerName, cfg.MCPServerVersion, opts...)
-	a := &Adapter{cfg: cfg, services: services}
+	a := &Adapter{cfg: cfg, services: services, authenticator: authenticator}
 	a.registerTools(s)
 	a.registerResources(s)
 	if cfg.MCPEnablePrompts {
@@ -197,9 +198,11 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 	if a.cfg.MCPEnableWriteTools {
 		s.AddTool(mcp.NewTool("ingest_coverage_run",
 			mcp.WithDescription("Ingest a coverage run using the existing OpenCoverage payload contract."),
+			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.handleIngestCoverageRun)
 		s.AddTool(mcp.NewTool("ingest_integration_run",
 			mcp.WithDescription("Ingest an integration-test run using the existing OpenCoverage payload contract."),
+			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.handleIngestIntegrationRun)
 	}
 }
@@ -460,6 +463,9 @@ func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallT
 	if !a.cfg.MCPEnableWriteTools || a.services.IngestCoverageRun == nil {
 		return toolErrorResult(application.NewUnauthenticated("coverage ingest tool is disabled")), nil
 	}
+	if err := a.authenticateWriteRequest(ctx, request); err != nil {
+		return toolErrorResult(err), nil
+	}
 	var in application.IngestCoverageRunInput
 	if err := request.BindArguments(&in); err != nil {
 		return toolErrorResult(application.NewInvalidArgument("invalid coverage ingest payload", map[string]any{"error": err.Error()})), nil
@@ -474,6 +480,9 @@ func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallT
 func (a *Adapter) handleIngestIntegrationRun(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !a.cfg.MCPEnableWriteTools || a.services.IngestIntegrationRun == nil {
 		return toolErrorResult(application.NewUnauthenticated("integration ingest tool is disabled")), nil
+	}
+	if err := a.authenticateWriteRequest(ctx, request); err != nil {
+		return toolErrorResult(err), nil
 	}
 	var in application.IngestIntegrationRunInput
 	if err := request.BindArguments(&in); err != nil {
@@ -632,6 +641,26 @@ func (a *Adapter) defaultRunsLimit() int {
 		return 10
 	}
 	return a.cfg.MCPDefaultRunsLimit
+}
+
+func (a *Adapter) authenticateWriteRequest(ctx context.Context, request mcp.CallToolRequest) error {
+	if a.authenticator == nil {
+		return application.NewUnauthenticated("write tool authentication is not configured")
+	}
+
+	apiKey := strings.TrimSpace(request.Header.Get(a.cfg.APIKeyHeader))
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(request.GetString("apiKey", ""))
+	}
+	if apiKey == "" {
+		return application.NewUnauthenticated("missing API key")
+	}
+
+	if err := a.authenticator.Authenticate(ctx, apiKey); err != nil {
+		return application.NewUnauthenticated("invalid API key")
+	}
+
+	return nil
 }
 
 func parseOptionalTime(raw string, field string) (*time.Time, error) {

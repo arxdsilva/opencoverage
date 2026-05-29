@@ -2,6 +2,7 @@ package mcpadapter
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/arxdsilva/opencoverage/internal/application"
@@ -12,16 +13,16 @@ import (
 
 func TestNewServerRegistersReadOnlySurface(t *testing.T) {
 	cfg := config.Config{
-		MCPServerName:        "opencoverage",
-		MCPServerVersion:     "test",
-		MCPTransport:         "stdio",
-		MCPMaxPageSize:       100,
-		MCPDefaultRunsLimit:  20,
-		MCPEnablePrompts:     true,
-		MCPEnableWriteTools:  false,
+		MCPServerName:       "opencoverage",
+		MCPServerVersion:    "test",
+		MCPTransport:        "stdio",
+		MCPMaxPageSize:      100,
+		MCPDefaultRunsLimit: 20,
+		MCPEnablePrompts:    true,
+		MCPEnableWriteTools: false,
 	}
 
-	s := NewServer(cfg, Services{})
+	s := NewServer(cfg, Services{}, nil)
 
 	if got := len(s.ListTools()); got != 10 {
 		t.Fatalf("expected 10 read tools, got %d", got)
@@ -54,11 +55,11 @@ func TestListProjectsToolHandlerReturnsStructuredJSON(t *testing.T) {
 				t.Fatalf("expected page size 5, got %d", in.PageSize)
 			}
 			return application.ListProjectsOutput{
-				Items: []application.ProjectResponse{{ID: "project-1", ProjectKey: "org/repo", Name: "repo", DefaultBranch: "main", GlobalThresholdPercent: 80}},
+				Items:      []application.ProjectResponse{{ID: "project-1", ProjectKey: "org/repo", Name: "repo", DefaultBranch: "main", GlobalThresholdPercent: 80}},
 				Pagination: application.PaginationResponse{Page: 2, PageSize: 5, TotalItems: 1, TotalPages: 1},
 			}, nil
 		}),
-	})
+	}, nil)
 
 	tool := s.GetTool("list_projects")
 	if tool == nil {
@@ -99,7 +100,7 @@ func TestListProjectsToolHandlerMapsAppError(t *testing.T) {
 		ListProjects: stubListProjects(func(ctx context.Context, in application.ListProjectsInput) (application.ListProjectsOutput, error) {
 			return application.ListProjectsOutput{}, application.NewNotFound("project catalog unavailable", map[string]any{"scope": "test"})
 		}),
-	})
+	}, nil)
 
 	tool := s.GetTool("list_projects")
 	result, err := tool.Handler(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_projects", Arguments: map[string]any{}}})
@@ -126,4 +127,105 @@ type stubListProjects func(ctx context.Context, in application.ListProjectsInput
 
 func (s stubListProjects) Execute(ctx context.Context, in application.ListProjectsInput) (application.ListProjectsOutput, error) {
 	return s(ctx, in)
+}
+
+func TestIngestCoverageRunRequiresAuthentication(t *testing.T) {
+	cfg := config.Config{
+		MCPServerName:       "opencoverage",
+		MCPServerVersion:    "test",
+		MCPTransport:        "stdio",
+		MCPMaxPageSize:      100,
+		MCPDefaultRunsLimit: 20,
+		MCPEnableWriteTools: true,
+		APIKeyHeader:        "X-API-Key",
+	}
+
+	s := NewServer(cfg, Services{
+		IngestCoverageRun: stubIngestCoverageRun(func(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error) {
+			t.Fatalf("ingest use case should not be called when auth fails")
+			return application.IngestCoverageRunOutput{}, nil
+		}),
+	}, stubAuthenticator{expected: "secret-key"})
+
+	tool := s.GetTool("ingest_coverage_run")
+	if tool == nil {
+		t.Fatalf("expected ingest_coverage_run tool to be registered")
+	}
+
+	result, err := tool.Handler(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Name: "ingest_coverage_run", Arguments: map[string]any{}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected handler error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatalf("expected authentication error result")
+	}
+
+	content, ok := result.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("expected structured error content, got %T", result.StructuredContent)
+	}
+	errorBody, ok := content["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected error body, got %#v", content)
+	}
+	if errorBody["code"] != "unauthorized" {
+		t.Fatalf("expected unauthorized code, got %#v", errorBody["code"])
+	}
+}
+
+func TestIngestCoverageRunAuthenticatesWithHeader(t *testing.T) {
+	cfg := config.Config{
+		MCPServerName:       "opencoverage",
+		MCPServerVersion:    "test",
+		MCPTransport:        "stdio",
+		MCPMaxPageSize:      100,
+		MCPDefaultRunsLimit: 20,
+		MCPEnableWriteTools: true,
+		APIKeyHeader:        "X-API-Key",
+	}
+
+	called := false
+	s := NewServer(cfg, Services{
+		IngestCoverageRun: stubIngestCoverageRun(func(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error) {
+			called = true
+			return application.IngestCoverageRunOutput{}, nil
+		}),
+	}, stubAuthenticator{expected: "secret-key"})
+
+	tool := s.GetTool("ingest_coverage_run")
+	result, err := tool.Handler(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Name: "ingest_coverage_run", Arguments: map[string]any{"apiKey": "secret-key"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected handler error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected successful result, got %#v", result.StructuredContent)
+	}
+	if !called {
+		t.Fatalf("expected ingest use case to be called on successful authentication")
+	}
+}
+
+type stubIngestCoverageRun func(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error)
+
+func (s stubIngestCoverageRun) Execute(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error) {
+	return s(ctx, in)
+}
+
+type stubAuthenticator struct {
+	expected string
+}
+
+func (s stubAuthenticator) Authenticate(ctx context.Context, apiKey string) error {
+	if apiKey != s.expected {
+		return fmt.Errorf("invalid key")
+	}
+	return nil
+}
+
+func (s stubAuthenticator) WantedAPIKey() string {
+	return s.expected
 }
