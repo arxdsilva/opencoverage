@@ -123,7 +123,7 @@ func NewIngestIntegrationRunUseCase(
 }
 
 func (uc *IngestIntegrationRunUseCase) Execute(ctx context.Context, in IngestIntegrationRunInput) (IngestIntegrationRunOutput, error) {
-	if err := validateIntegrationIngestInput(in); err != nil {
+	if err := ValidateIntegrationIngestInput(in); err != nil {
 		return IngestIntegrationRunOutput{}, err
 	}
 
@@ -365,12 +365,28 @@ func validateIntegrationIngestInput(in IngestIntegrationRunInput) error {
 		if spec.RunTime < 0 {
 			return NewInvalidArgument("runTime must be >= 0", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].runTime", i)})
 		}
-		if normalizeGinkgoState(spec.State) == domain.IntegrationSpecStateFailed && (spec.Failure == nil || strings.TrimSpace(spec.Failure.Message) == "") {
-			return NewInvalidArgument("failure.message is required when state is failed", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].failure.message", i)})
+		if normalizeGinkgoState(spec.State) == domain.IntegrationSpecStateFailed {
+			if spec.Failure == nil || strings.TrimSpace(spec.Failure.Message) == "" {
+				return NewInvalidArgument("failure.message is required when state is failed", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].failure.message", i)})
+			}
+			if spec.Failure.Location == nil {
+				return NewInvalidArgument("failure.location is required when state is failed", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].failure.location", i)})
+			}
+			if strings.TrimSpace(spec.Failure.Location.FileName) == "" {
+				return NewInvalidArgument("failure.location.fileName is required when state is failed", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].failure.location.fileName", i)})
+			}
+			if spec.Failure.Location.LineNumber < 0 {
+				return NewInvalidArgument("failure.location.lineNumber must be >= 0 when state is failed", map[string]any{"field": fmt.Sprintf("ginkgoReport.specReports[%d].failure.location.lineNumber", i)})
+			}
 		}
 	}
 
 	return nil
+}
+
+// ValidateIntegrationIngestInput validates an integration ingest payload.
+func ValidateIntegrationIngestInput(in IngestIntegrationRunInput) error {
+	return validateIntegrationIngestInput(in)
 }
 
 func normalizeGinkgoState(state string) domain.IntegrationSpecState {

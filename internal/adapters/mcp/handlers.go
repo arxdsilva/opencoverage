@@ -261,7 +261,7 @@ func (a *Adapter) handleIngestIntegrationRun(ctx context.Context, request mcp.Ca
 	if err := bindPayloadOrArguments(request, &in); err != nil {
 		return toolErrorResult(application.NewInvalidArgument("invalid integration ingest payload", map[string]any{"error": err.Error()})), nil
 	}
-	if err := validateIntegrationIngestInput(in); err != nil {
+	if err := application.ValidateIntegrationIngestInput(in); err != nil {
 		return toolErrorResult(err), nil
 	}
 	out, err := a.services.IngestIntegrationRun.Execute(ctx, in)
