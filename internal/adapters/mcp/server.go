@@ -207,7 +207,6 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 				},
 				mcp.Properties(coverageIngestPayloadProperties()),
 			),
-			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.withToolLogging("ingest_coverage_run", a.handleIngestCoverageRun))
 		s.AddTool(mcp.NewTool("ingest_integration_run",
 			mcp.WithDescription("Ingest an integration-test run using the existing OpenCoverage payload contract."),
@@ -219,7 +218,6 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 				},
 				mcp.Properties(integrationIngestPayloadProperties()),
 			),
-			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.withToolLogging("ingest_integration_run", a.handleIngestIntegrationRun))
 	}
 }

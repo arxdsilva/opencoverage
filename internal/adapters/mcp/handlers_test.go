@@ -90,6 +90,14 @@ func newTestAdapter(cfg config.Config, services Services, authenticator applicat
 	return &Adapter{cfg: cfg, services: services, authenticator: authenticator}
 }
 
+func writeToolRequest(apiKey string, arguments map[string]any) mcp.CallToolRequest {
+	header := http.Header{}
+	if apiKey != "" {
+		header.Set("X-API-Key", apiKey)
+	}
+	return mcp.CallToolRequest{Header: header, Params: mcp.CallToolParams{Arguments: arguments}}
+}
+
 func TestHandleListProjects(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		called := false
@@ -600,8 +608,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey": "secret",
+		result, err := a.handleIngestCoverageRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"payload": map[string]any{
 				"projectKey":           "org/repo",
 				"branch":               "main",
@@ -614,7 +621,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"coveragePercent": 88.5,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || result.IsError || !called {
 			t.Fatalf("expected successful ingest coverage run")
 		}
@@ -627,10 +634,9 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey":  "secret",
+		result, err := a.handleIngestCoverageRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"payload": map[string]any{"projectKey": func() {}},
-		}}})
+		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected invalid coverage ingest payload")
 		}
@@ -643,8 +649,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey": "secret",
+		result, err := a.handleIngestCoverageRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"payload": map[string]any{
 				"projectKey":           "org/repo",
 				"branch":               "main",
@@ -657,7 +662,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"coveragePercent": 88.5,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected coverage ingest downstream error")
 		}
@@ -671,8 +676,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey": "secret",
+		result, err := a.handleIngestCoverageRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"payload": map[string]any{
 				"projectKey":           "org/repo",
 				"branch":               "main",
@@ -685,7 +689,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"coveragePercent": 88.5,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected coverage ingest validation error")
 		}
@@ -703,8 +707,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey":       "secret",
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"projectKey":   "org/repo",
 			"branch":       "main",
 			"commitSha":    "abc123",
@@ -719,7 +722,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"runTime":      0.1,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || result.IsError || !called {
 			t.Fatalf("expected successful ingest integration run")
 		}
@@ -732,7 +735,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{"apiKey": "wrong"}}})
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("wrong", map[string]any{}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected unauthorized result")
 		}
@@ -745,7 +748,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{"apiKey": "secret", "payload": map[string]any{"projectKey": func() {}}}}})
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{"payload": map[string]any{"projectKey": func() {}}}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected invalid integration ingest payload")
 		}
@@ -753,7 +756,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 
 	t.Run("integration ingest missing service", func(t *testing.T) {
 		a := newTestAdapter(config.Config{MCPEnableWriteTools: true}, Services{}, stubAuthenticator{expected: "secret"})
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{"apiKey": "secret"}}})
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected missing integration ingest service error")
 		}
@@ -766,8 +769,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey":       "secret",
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"projectKey":   "org/repo",
 			"branch":       "main",
 			"commitSha":    "abc123",
@@ -782,7 +784,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"runTime":      0.1,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected integration ingest downstream error")
 		}
@@ -796,8 +798,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
-			"apiKey":       "secret",
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
 			"projectKey":   "org/repo",
 			"branch":       "main",
 			"commitSha":    "abc123",
@@ -812,7 +813,7 @@ func TestHandleIngestHandlers(t *testing.T) {
 					"runTime":      0.1,
 				}},
 			},
-		}}})
+		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected integration ingest validation error")
 		}
@@ -1048,11 +1049,11 @@ func TestHandlerHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("authenticate with argument", func(t *testing.T) {
+	t.Run("authenticate missing header", func(t *testing.T) {
 		authAdapter := newTestAdapter(config.Config{APIKeyHeader: "X-API-Key"}, Services{}, stubAuthenticator{expected: "secret"})
-		err := authAdapter.authenticateWriteRequest(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{"apiKey": "secret"}}})
-		if err != nil {
-			t.Fatalf("expected successful auth, got %v", err)
+		err := authAdapter.authenticateWriteRequest(context.Background(), mcp.CallToolRequest{})
+		if err == nil {
+			t.Fatalf("expected missing-header auth failure")
 		}
 	})
 

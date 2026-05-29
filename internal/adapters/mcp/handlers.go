@@ -481,12 +481,9 @@ func (a *Adapter) authenticateWriteRequest(ctx context.Context, request mcp.Call
 		return application.NewUnauthenticated("write tool authentication is not configured")
 	}
 
-	apiKey := strings.TrimSpace(request.Header.Get(a.cfg.APIKeyHeader))
+	apiKey := request.Header.Get(a.cfg.APIKeyHeader)
 	if apiKey == "" {
-		apiKey = strings.TrimSpace(request.GetString("apiKey", ""))
-	}
-	if apiKey == "" {
-		return application.NewUnauthenticated("missing API key")
+		return application.NewUnauthenticated("missing API key header")
 	}
 
 	if err := a.authenticator.Authenticate(ctx, apiKey); err != nil {

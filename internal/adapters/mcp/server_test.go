@@ -3,6 +3,7 @@ package mcpadapter
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"slices"
 	"testing"
 	"time"
@@ -195,6 +196,9 @@ func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
 	if _, ok := coverageTool.Tool.InputSchema.Properties["payload"]; !ok {
 		t.Fatalf("expected ingest_coverage_run schema to advertise payload")
 	}
+	if _, ok := coverageTool.Tool.InputSchema.Properties["apiKey"]; ok {
+		t.Fatalf("expected ingest_coverage_run schema to omit apiKey")
+	}
 	coveragePayload, ok := coverageTool.Tool.InputSchema.Properties["payload"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected coverage payload schema to be object, got %T", coverageTool.Tool.InputSchema.Properties["payload"])
@@ -234,6 +238,9 @@ func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
 	}
 	if _, ok := integrationTool.Tool.InputSchema.Properties["payload"]; !ok {
 		t.Fatalf("expected ingest_integration_run schema to advertise payload")
+	}
+	if _, ok := integrationTool.Tool.InputSchema.Properties["apiKey"]; ok {
+		t.Fatalf("expected ingest_integration_run schema to omit apiKey")
 	}
 	integrationPayload, ok := integrationTool.Tool.InputSchema.Properties["payload"].(map[string]any)
 	if !ok {
@@ -325,9 +332,11 @@ func TestIngestCoverageRunAuthenticatesWithHeader(t *testing.T) {
 	}, stubAuthenticator{expected: "secret-key"})
 
 	tool := s.GetTool("ingest_coverage_run")
+	header := http.Header{}
+	header.Set("X-API-Key", "secret-key")
 	result, err := tool.Handler(context.Background(), mcp.CallToolRequest{
+		Header: header,
 		Params: mcp.CallToolParams{Name: "ingest_coverage_run", Arguments: map[string]any{
-			"apiKey": "secret-key",
 			"payload": map[string]any{
 				"projectKey":           "org/repo",
 				"branch":               "main",

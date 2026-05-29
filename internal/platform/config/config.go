@@ -134,6 +134,9 @@ func (c Config) ValidateMCP() error {
 	if c.MCPDefaultRunsLimit <= 0 {
 		return fmt.Errorf("mcp default runs limit must be positive")
 	}
+	if c.MCPEnableWriteTools && c.MCPTransport == "stdio" {
+		return fmt.Errorf("mcp write tools require a header-capable transport")
+	}
 	if c.MCPEnableWriteTools && c.APIKeySecret == "" {
 		return fmt.Errorf("api key secret cannot be empty when mcp write tools are enabled")
 	}
