@@ -603,8 +603,16 @@ func TestHandleIngestHandlers(t *testing.T) {
 		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
 			"apiKey": "secret",
 			"payload": map[string]any{
-				"projectKey": "org/repo",
-				"packages":   []any{},
+				"projectKey":           "org/repo",
+				"branch":               "main",
+				"commitSha":            "abc123",
+				"triggerType":          "push",
+				"runTimestamp":         time.Now().UTC().Format(time.RFC3339),
+				"totalCoveragePercent": 88.5,
+				"packages": []any{map[string]any{
+					"importPath":      "github.com/org/repo/pkg",
+					"coveragePercent": 88.5,
+				}},
 			},
 		}}})
 		if err != nil || result.IsError || !called {
@@ -638,12 +646,48 @@ func TestHandleIngestHandlers(t *testing.T) {
 		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
 			"apiKey": "secret",
 			"payload": map[string]any{
-				"projectKey": "org/repo",
-				"packages":   []any{},
+				"projectKey":           "org/repo",
+				"branch":               "main",
+				"commitSha":            "abc123",
+				"triggerType":          "push",
+				"runTimestamp":         time.Now().UTC().Format(time.RFC3339),
+				"totalCoveragePercent": 88.5,
+				"packages": []any{map[string]any{
+					"importPath":      "github.com/org/repo/pkg",
+					"coveragePercent": 88.5,
+				}},
 			},
 		}}})
 		if err != nil || !result.IsError {
 			t.Fatalf("expected coverage ingest downstream error")
+		}
+	})
+
+	t.Run("coverage ingest validation failure", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true, APIKeyHeader: "X-API-Key"}, Services{
+			IngestCoverageRun: stubIngestCoverageRun(func(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error) {
+				t.Fatalf("ingest use case should not run on validation failure")
+				return application.IngestCoverageRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestCoverageRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
+			"apiKey": "secret",
+			"payload": map[string]any{
+				"projectKey":           "org/repo",
+				"branch":               "main",
+				"commitSha":            "abc123",
+				"triggerType":          "push",
+				"runTimestamp":         "not-time",
+				"totalCoveragePercent": 88.5,
+				"packages": []any{map[string]any{
+					"importPath":      "github.com/org/repo/pkg",
+					"coveragePercent": 88.5,
+				}},
+			},
+		}}})
+		if err != nil || !result.IsError {
+			t.Fatalf("expected coverage ingest validation error")
 		}
 	})
 
@@ -662,7 +706,19 @@ func TestHandleIngestHandlers(t *testing.T) {
 		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
 			"apiKey":       "secret",
 			"projectKey":   "org/repo",
-			"ginkgoReport": map[string]any{},
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "passed",
+					"runTime":      0.1,
+				}},
+			},
 		}}})
 		if err != nil || result.IsError || !called {
 			t.Fatalf("expected successful ingest integration run")
@@ -710,9 +766,55 @@ func TestHandleIngestHandlers(t *testing.T) {
 			}),
 		}, stubAuthenticator{expected: "secret"})
 
-		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{"apiKey": "secret", "projectKey": "org/repo", "ginkgoReport": map[string]any{}}}})
+		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
+			"apiKey":       "secret",
+			"projectKey":   "org/repo",
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "passed",
+					"runTime":      0.1,
+				}},
+			},
+		}}})
 		if err != nil || !result.IsError {
 			t.Fatalf("expected integration ingest downstream error")
+		}
+	})
+
+	t.Run("integration ingest validation failure", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true}, Services{
+			IngestIntegrationRun: stubIngestIntegrationRun(func(ctx context.Context, in application.IngestIntegrationRunInput) (application.IngestIntegrationRunOutput, error) {
+				t.Fatalf("ingest integration use case should not run on validation failure")
+				return application.IngestIntegrationRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestIntegrationRun(context.Background(), mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: map[string]any{
+			"apiKey":       "secret",
+			"projectKey":   "org/repo",
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "failed",
+					"runTime":      0.1,
+				}},
+			},
+		}}})
+		if err != nil || !result.IsError {
+			t.Fatalf("expected integration ingest validation error")
 		}
 	})
 }

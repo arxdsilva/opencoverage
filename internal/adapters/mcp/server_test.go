@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/arxdsilva/opencoverage/internal/application"
 	"github.com/arxdsilva/opencoverage/internal/platform/config"
@@ -304,7 +305,21 @@ func TestIngestCoverageRunAuthenticatesWithHeader(t *testing.T) {
 
 	tool := s.GetTool("ingest_coverage_run")
 	result, err := tool.Handler(context.Background(), mcp.CallToolRequest{
-		Params: mcp.CallToolParams{Name: "ingest_coverage_run", Arguments: map[string]any{"apiKey": "secret-key"}},
+		Params: mcp.CallToolParams{Name: "ingest_coverage_run", Arguments: map[string]any{
+			"apiKey": "secret-key",
+			"payload": map[string]any{
+				"projectKey":           "org/repo",
+				"branch":               "main",
+				"commitSha":            "abc123",
+				"triggerType":          "push",
+				"runTimestamp":         time.Now().UTC().Format(time.RFC3339),
+				"totalCoveragePercent": 80.0,
+				"packages": []any{map[string]any{
+					"importPath":      "github.com/org/repo/pkg",
+					"coveragePercent": 80.0,
+				}},
+			},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("unexpected handler error: %v", err)
