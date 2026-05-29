@@ -856,6 +856,13 @@ func TestPromptHandlers(t *testing.T) {
 func TestHandlerHelpers(t *testing.T) {
 	a := newTestAdapter(config.Config{MCPMaxPageSize: 50, MCPDefaultRunsLimit: 15}, Services{}, nil)
 
+	if got := a.normalizePage(0); got != 1 {
+		t.Fatalf("expected normalized page to be 1, got %d", got)
+	}
+	if got := a.normalizePage(3); got != 3 {
+		t.Fatalf("expected unchanged page, got %d", got)
+	}
+
 	if got := a.normalizePageSize(0); got != defaultListPageSize {
 		t.Fatalf("expected default page size, got %d", got)
 	}
@@ -868,10 +875,36 @@ func TestHandlerHelpers(t *testing.T) {
 	if got := a.defaultRunsLimit(); got != 15 {
 		t.Fatalf("expected configured runs limit, got %d", got)
 	}
+	if got := a.normalizeContributorLimit(0); got != defaultContributorLimit {
+		t.Fatalf("expected default contributor limit, got %d", got)
+	}
+	if got := a.normalizeContributorLimit(200); got != maxContributorLimit {
+		t.Fatalf("expected capped contributor limit, got %d", got)
+	}
+	if got := a.normalizeContributorLimit(7); got != 7 {
+		t.Fatalf("expected unchanged contributor limit, got %d", got)
+	}
+	if got := a.normalizeRunsPerProject(0); got != 15 {
+		t.Fatalf("expected default runs per project, got %d", got)
+	}
+	if got := a.normalizeRunsPerProject(200); got != maxRunsPerProject {
+		t.Fatalf("expected capped runs per project, got %d", got)
+	}
+	if got := a.normalizeRunsPerProject(8); got != 8 {
+		t.Fatalf("expected unchanged runs per project, got %d", got)
+	}
 
 	fallbackAdapter := &Adapter{cfg: config.Config{MCPDefaultRunsLimit: 0}}
 	if got := fallbackAdapter.defaultRunsLimit(); got != 10 {
 		t.Fatalf("expected fallback runs limit, got %d", got)
+	}
+	if got := fallbackAdapter.normalizeRunsPerProject(0); got != 10 {
+		t.Fatalf("expected fallback normalized runs per project, got %d", got)
+	}
+
+	cappedDefaultAdapter := &Adapter{cfg: config.Config{MCPDefaultRunsLimit: 200}}
+	if got := cappedDefaultAdapter.normalizeRunsPerProject(0); got != maxRunsPerProject {
+		t.Fatalf("expected capped default runs per project, got %d", got)
 	}
 
 	t.Run("authenticate missing authenticator", func(t *testing.T) {

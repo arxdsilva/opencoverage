@@ -11,13 +11,18 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+const (
+	maxContributorLimit = 25
+	maxRunsPerProject   = 30
+)
+
 // handleListProjects returns a paginated list of projects.
 func (a *Adapter) handleListProjects(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListProjects == nil {
 		return toolErrorResult(application.NewInternal("list projects use case is not configured", nil)), nil
 	}
 	out, err := a.services.ListProjects.Execute(ctx, application.ListProjectsInput{
-		Page:     request.GetInt("page", 1),
+		Page:     a.normalizePage(request.GetInt("page", 1)),
 		PageSize: a.normalizePageSize(request.GetInt("pageSize", defaultListPageSize)),
 	})
 	if err != nil {
@@ -80,7 +85,7 @@ func (a *Adapter) handleListCoverageRuns(ctx context.Context, request mcp.CallTo
 		Branch:    request.GetString("branch", ""),
 		From:      from,
 		To:        to,
-		Page:      request.GetInt("page", 1),
+		Page:      a.normalizePage(request.GetInt("page", 1)),
 		PageSize:  a.normalizePageSize(request.GetInt("pageSize", defaultListPageSize)),
 	})
 	if err != nil {
@@ -128,7 +133,7 @@ func (a *Adapter) handleListContributors(ctx context.Context, request mcp.CallTo
 	}
 	out, err := a.services.ListContributors.Execute(ctx, application.ListContributorsInput{
 		ProjectID: projectID,
-		Limit:     request.GetInt("limit", defaultContributorLimit),
+		Limit:     a.normalizeContributorLimit(request.GetInt("limit", defaultContributorLimit)),
 	})
 	if err != nil {
 		return toolErrorResult(err), nil
@@ -160,7 +165,7 @@ func (a *Adapter) handleListIntegrationRuns(ctx context.Context, request mcp.Cal
 		Environment: request.GetString("environment", ""),
 		From:        from,
 		To:          to,
-		Page:        request.GetInt("page", 1),
+		Page:        a.normalizePage(request.GetInt("page", 1)),
 		PageSize:    a.normalizePageSize(request.GetInt("pageSize", defaultListPageSize)),
 	})
 	if err != nil {
@@ -213,7 +218,7 @@ func (a *Adapter) handleGetIntegrationHeatmap(ctx context.Context, request mcp.C
 	out, err := a.services.GetIntegrationHeatmap.Execute(ctx, application.IntegrationHeatmapInput{
 		Branch:         request.GetString("branch", ""),
 		Status:         request.GetString("status", ""),
-		RunsPerProject: request.GetInt("runsPerProject", a.defaultRunsLimit()),
+		RunsPerProject: a.normalizeRunsPerProject(request.GetInt("runsPerProject", a.defaultRunsLimit())),
 	})
 	if err != nil {
 		return toolErrorResult(err), nil
@@ -407,6 +412,37 @@ func (a *Adapter) normalizePageSize(pageSize int) int {
 		return a.cfg.MCPMaxPageSize
 	}
 	return pageSize
+}
+
+func (a *Adapter) normalizePage(page int) int {
+	if page <= 0 {
+		return 1
+	}
+	return page
+}
+
+func (a *Adapter) normalizeContributorLimit(limit int) int {
+	if limit <= 0 {
+		return defaultContributorLimit
+	}
+	if limit > maxContributorLimit {
+		return maxContributorLimit
+	}
+	return limit
+}
+
+func (a *Adapter) normalizeRunsPerProject(limit int) int {
+	defaultLimit := a.defaultRunsLimit()
+	if defaultLimit > maxRunsPerProject {
+		defaultLimit = maxRunsPerProject
+	}
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxRunsPerProject {
+		return maxRunsPerProject
+	}
+	return limit
 }
 
 func (a *Adapter) defaultRunsLimit() int {
