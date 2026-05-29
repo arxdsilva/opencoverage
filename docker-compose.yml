@@ -93,5 +93,27 @@ services:
     ports:
       - "8090:8090"
 
+  mcp:
+    build:
+      context: .
+      dockerfile: cmd/mcp/Dockerfile
+    container_name: coverage-api-mcp
+    environment:
+      DATABASE_URL: postgres://coverage:coverage@db:5432/coverage?sslmode=disable
+      API_KEY_SECRET: dev-local-key
+      MCP_SERVER_NAME: opencoverage
+      MCP_SERVER_VERSION: dev
+      MCP_TRANSPORT: stdio
+      MCP_LOG_LEVEL: info
+      MCP_ENABLE_WRITE_TOOLS: "false"
+      MCP_MAX_PAGE_SIZE: "100"
+      MCP_DEFAULT_RUNS_LIMIT: "20"
+      MCP_ENABLE_PROMPTS: "true"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    stdin_open: true
+    tty: true
+
 volumes:
   postgres18_data:
