@@ -377,6 +377,9 @@ func (a *Adapter) readProjectContributorsResource(ctx context.Context, request m
 // getSummarizeProjectHealthPrompt builds a prompt for a project health summary workflow.
 func (a *Adapter) getSummarizeProjectHealthPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
+	if projectID == "" {
+		return nil, application.NewInvalidArgument("projectId is required", map[string]any{"field": "projectId"})
+	}
 	branch := strings.TrimSpace(request.Params.Arguments["branch"])
 	text := fmt.Sprintf("Summarize project health for project %q. First call get_project with projectId=%q. Then call get_latest_coverage_comparison with projectId=%q", projectID, projectID, projectID)
 	if branch != "" {
@@ -389,6 +392,9 @@ func (a *Adapter) getSummarizeProjectHealthPrompt(_ context.Context, request mcp
 // getInvestigateCoverageRegressionPrompt builds a prompt for investigating coverage regressions.
 func (a *Adapter) getInvestigateCoverageRegressionPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
+	if projectID == "" {
+		return nil, application.NewInvalidArgument("projectId is required", map[string]any{"field": "projectId"})
+	}
 	branch := strings.TrimSpace(request.Params.Arguments["branch"])
 	text := fmt.Sprintf("Investigate coverage regression for project %q. Start with get_latest_coverage_comparison using projectId=%q", projectID, projectID)
 	if branch != "" {
@@ -401,6 +407,9 @@ func (a *Adapter) getInvestigateCoverageRegressionPrompt(_ context.Context, requ
 // getInvestigateIntegrationFailuresPrompt builds a prompt for investigating integration failures.
 func (a *Adapter) getInvestigateIntegrationFailuresPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
+	if projectID == "" {
+		return nil, application.NewInvalidArgument("projectId is required", map[string]any{"field": "projectId"})
+	}
 	environment := strings.TrimSpace(request.Params.Arguments["environment"])
 	text := fmt.Sprintf("Investigate integration failures for project %q. Start with get_latest_integration_comparison using projectId=%q. Then call list_integration_runs with projectId=%q", projectID, projectID, projectID)
 	if environment != "" {

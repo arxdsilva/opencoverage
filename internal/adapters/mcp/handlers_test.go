@@ -953,6 +953,16 @@ func TestPromptHandlers(t *testing.T) {
 	if !strings.Contains(string(encoded), "stage") {
 		t.Fatalf("expected integration prompt payload to include environment")
 	}
+
+	if result, err := a.getSummarizeProjectHealthPrompt(context.Background(), mcp.GetPromptRequest{Params: mcp.GetPromptParams{Arguments: map[string]string{"projectId": ""}}}); err == nil || result != nil {
+		t.Fatalf("expected summarize project health prompt to reject empty projectId")
+	}
+	if result, err := a.getInvestigateCoverageRegressionPrompt(context.Background(), mcp.GetPromptRequest{Params: mcp.GetPromptParams{Arguments: map[string]string{"projectId": ""}}}); err == nil || result != nil {
+		t.Fatalf("expected investigate coverage regression prompt to reject empty projectId")
+	}
+	if result, err := a.getInvestigateIntegrationFailuresPrompt(context.Background(), mcp.GetPromptRequest{Params: mcp.GetPromptParams{Arguments: map[string]string{"projectId": ""}}}); err == nil || result != nil {
+		t.Fatalf("expected investigate integration failures prompt to reject empty projectId")
+	}
 }
 
 func TestHandlerHelpers(t *testing.T) {
