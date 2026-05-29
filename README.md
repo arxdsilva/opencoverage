@@ -92,7 +92,8 @@ Optional MCP settings:
 
 - `MCP_TRANSPORT` (default `stdio`)
 - `MCP_ENABLE_PROMPTS` (default `true`)
-- `MCP_ENABLE_WRITE_TOOLS` (default `false`)
+- `MCP_LOG_LEVEL` (default `info`) - MCP server log verbosity (for example: `debug`, `info`, `warn`, `error`).
+- `MCP_ENABLE_WRITE_TOOLS` (default `false`) - enables `ingest_coverage_run` and `ingest_integration_run`; requires `API_KEY_SECRET` to be set as a non-empty shared secret in your shell or deployment environment (for example `export API_KEY_SECRET="dev-local-key"`) before starting `go run ./cmd/mcp`.
 - `MCP_MAX_PAGE_SIZE` (default `100`)
 - `MCP_DEFAULT_RUNS_LIMIT` (default `20`)
 
