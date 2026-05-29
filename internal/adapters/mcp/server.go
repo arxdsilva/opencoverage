@@ -428,7 +428,7 @@ func errorPayload(err error) map[string]any {
 		return payload
 	}
 	if err != nil {
-		payload["message"] = err.Error()
+		slog.Error("mcp_error_fallback", "error", err)
 	}
 	return payload
 }

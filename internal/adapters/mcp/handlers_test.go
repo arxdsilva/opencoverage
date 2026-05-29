@@ -1061,3 +1061,14 @@ func TestFormatErrorSummary(t *testing.T) {
 		}
 	})
 }
+
+func TestErrorPayloadForNonAppErrorIsGeneric(t *testing.T) {
+	payload := errorPayload(errors.New("sql: password authentication failed for user app"))
+
+	if payload["code"] != "internal" {
+		t.Fatalf("expected internal code, got %#v", payload["code"])
+	}
+	if payload["message"] != "internal server error" {
+		t.Fatalf("expected generic internal message, got %#v", payload["message"])
+	}
+}
