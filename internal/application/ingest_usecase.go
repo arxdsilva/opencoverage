@@ -66,7 +66,7 @@ func NewIngestCoverageRunUseCase(
 }
 
 func (uc *IngestCoverageRunUseCase) Execute(ctx context.Context, in IngestCoverageRunInput) (IngestCoverageRunOutput, error) {
-	if err := validateIngestInput(in); err != nil {
+	if err := ValidateCoverageIngestInput(in); err != nil {
 		return IngestCoverageRunOutput{}, err
 	}
 
@@ -245,4 +245,9 @@ func validateIngestInput(in IngestCoverageRunInput) error {
 	}
 
 	return nil
+}
+
+// ValidateCoverageIngestInput validates a coverage ingest payload.
+func ValidateCoverageIngestInput(in IngestCoverageRunInput) error {
+	return validateIngestInput(in)
 }

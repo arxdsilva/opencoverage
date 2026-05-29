@@ -681,8 +681,8 @@ func TestHandleIngestHandlers(t *testing.T) {
 				"projectKey":           "org/repo",
 				"branch":               "main",
 				"commitSha":            "abc123",
-				"triggerType":          "push",
-				"runTimestamp":         "not-time",
+				"triggerType":          "unknown",
+				"runTimestamp":         time.Now().UTC().Format(time.RFC3339),
 				"totalCoveragePercent": 88.5,
 				"packages": []any{map[string]any{
 					"importPath":      "github.com/org/repo/pkg",
@@ -692,6 +692,33 @@ func TestHandleIngestHandlers(t *testing.T) {
 		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected coverage ingest validation error")
+		}
+	})
+
+	t.Run("coverage ingest rejects duplicate packages", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true, APIKeyHeader: "X-API-Key"}, Services{
+			IngestCoverageRun: stubIngestCoverageRun(func(ctx context.Context, in application.IngestCoverageRunInput) (application.IngestCoverageRunOutput, error) {
+				t.Fatalf("ingest use case should not run on validation failure")
+				return application.IngestCoverageRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestCoverageRun(context.Background(), writeToolRequest("secret", map[string]any{
+			"payload": map[string]any{
+				"projectKey":           "org/repo",
+				"branch":               "main",
+				"commitSha":            "abc123",
+				"triggerType":          "push",
+				"runTimestamp":         time.Now().UTC().Format(time.RFC3339),
+				"totalCoveragePercent": 88.5,
+				"packages": []any{
+					map[string]any{"importPath": "github.com/org/repo/pkg", "coveragePercent": 88.5},
+					map[string]any{"importPath": "github.com/org/repo/pkg", "coveragePercent": 80.0},
+				},
+			},
+		}))
+		if err != nil || !result.IsError {
+			t.Fatalf("expected duplicate package validation error")
 		}
 	})
 
@@ -816,6 +843,110 @@ func TestHandleIngestHandlers(t *testing.T) {
 		}))
 		if err != nil || !result.IsError {
 			t.Fatalf("expected integration ingest validation error")
+		}
+	})
+
+	t.Run("integration ingest failed spec requires failure location", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true}, Services{
+			IngestIntegrationRun: stubIngestIntegrationRun(func(ctx context.Context, in application.IngestIntegrationRunInput) (application.IngestIntegrationRunOutput, error) {
+				t.Fatalf("ingest integration use case should not run on validation failure")
+				return application.IngestIntegrationRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
+			"projectKey":   "org/repo",
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "failed",
+					"runTime":      0.1,
+					"failure": map[string]any{
+						"message": "boom",
+					},
+				}},
+			},
+		}))
+		if err != nil || !result.IsError {
+			t.Fatalf("expected failure location validation error")
+		}
+	})
+
+	t.Run("integration ingest failed spec rejects bad failure location fields", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true}, Services{
+			IngestIntegrationRun: stubIngestIntegrationRun(func(ctx context.Context, in application.IngestIntegrationRunInput) (application.IngestIntegrationRunOutput, error) {
+				t.Fatalf("ingest integration use case should not run on validation failure")
+				return application.IngestIntegrationRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
+			"projectKey":   "org/repo",
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "failed",
+					"runTime":      0.1,
+					"failure": map[string]any{
+						"message": "boom",
+						"location": map[string]any{
+							"fileName":   "   ",
+							"lineNumber": -1,
+						},
+					},
+				}},
+			},
+		}))
+		if err != nil || !result.IsError {
+			t.Fatalf("expected bad failure location validation error")
+		}
+	})
+
+	t.Run("integration ingest failed spec rejects negative failure location line number", func(t *testing.T) {
+		a := newTestAdapter(config.Config{MCPEnableWriteTools: true}, Services{
+			IngestIntegrationRun: stubIngestIntegrationRun(func(ctx context.Context, in application.IngestIntegrationRunInput) (application.IngestIntegrationRunOutput, error) {
+				t.Fatalf("ingest integration use case should not run on validation failure")
+				return application.IngestIntegrationRunOutput{}, nil
+			}),
+		}, stubAuthenticator{expected: "secret"})
+
+		result, err := a.handleIngestIntegrationRun(context.Background(), writeToolRequest("secret", map[string]any{
+			"projectKey":   "org/repo",
+			"branch":       "main",
+			"commitSha":    "abc123",
+			"triggerType":  "push",
+			"runTimestamp": time.Now().UTC().Format(time.RFC3339),
+			"ginkgoReport": map[string]any{
+				"suiteDescription": "suite",
+				"suitePath":        "integration/suite",
+				"specReports": []any{map[string]any{
+					"leafNodeText": "spec",
+					"state":        "failed",
+					"runTime":      0.1,
+					"failure": map[string]any{
+						"message": "boom",
+						"location": map[string]any{
+							"fileName":   "spec_test.go",
+							"lineNumber": -1,
+						},
+					},
+				}},
+			},
+		}))
+		if err != nil || !result.IsError {
+			t.Fatalf("expected negative line number validation error")
 		}
 	})
 }

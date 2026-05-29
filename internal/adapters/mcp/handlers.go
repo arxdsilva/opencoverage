@@ -239,7 +239,7 @@ func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallT
 	if err := bindPayloadOrArguments(request, &in); err != nil {
 		return toolErrorResult(application.NewInvalidArgument("invalid coverage ingest payload", map[string]any{"error": err.Error()})), nil
 	}
-	if err := validateCoverageIngestInput(in); err != nil {
+	if err := application.ValidateCoverageIngestInput(in); err != nil {
 		return toolErrorResult(err), nil
 	}
 	out, err := a.services.IngestCoverageRun.Execute(ctx, in)
