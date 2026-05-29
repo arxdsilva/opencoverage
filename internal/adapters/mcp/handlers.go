@@ -11,6 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// handleListProjects returns a paginated list of projects.
 func (a *Adapter) handleListProjects(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListProjects == nil {
 		return toolErrorResult(application.NewInternal("list projects use case is not configured", nil)), nil
@@ -25,6 +26,7 @@ func (a *Adapter) handleListProjects(ctx context.Context, request mcp.CallToolRe
 	return toolJSONResult(out)
 }
 
+// handleGetProject returns project metadata for a single project ID.
 func (a *Adapter) handleGetProject(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.GetProject == nil {
 		return toolErrorResult(application.NewInternal("get project use case is not configured", nil)), nil
@@ -40,6 +42,7 @@ func (a *Adapter) handleGetProject(ctx context.Context, request mcp.CallToolRequ
 	return toolJSONResult(out)
 }
 
+// handleListBranches returns known branches for a project.
 func (a *Adapter) handleListBranches(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListBranches == nil {
 		return toolErrorResult(application.NewInternal("list branches use case is not configured", nil)), nil
@@ -55,6 +58,7 @@ func (a *Adapter) handleListBranches(ctx context.Context, request mcp.CallToolRe
 	return toolJSONResult(out)
 }
 
+// handleListCoverageRuns returns paginated coverage runs with optional filters.
 func (a *Adapter) handleListCoverageRuns(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListCoverageRuns == nil {
 		return toolErrorResult(application.NewInternal("list coverage runs use case is not configured", nil)), nil
@@ -85,6 +89,7 @@ func (a *Adapter) handleListCoverageRuns(ctx context.Context, request mcp.CallTo
 	return toolJSONResult(out)
 }
 
+// handleGetLatestCoverageComparison returns the latest coverage comparison envelope.
 func (a *Adapter) handleGetLatestCoverageComparison(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.GetLatestComparison == nil || a.services.GetProject == nil {
 		return toolErrorResult(application.NewInternal("latest coverage comparison dependencies are not configured", nil)), nil
@@ -112,6 +117,7 @@ func (a *Adapter) handleGetLatestCoverageComparison(ctx context.Context, request
 	})
 }
 
+// handleListContributors returns top contributors for a project.
 func (a *Adapter) handleListContributors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListContributors == nil {
 		return toolErrorResult(application.NewInternal("list contributors use case is not configured", nil)), nil
@@ -130,6 +136,7 @@ func (a *Adapter) handleListContributors(ctx context.Context, request mcp.CallTo
 	return toolJSONResult(out)
 }
 
+// handleListIntegrationRuns returns paginated integration runs with optional filters.
 func (a *Adapter) handleListIntegrationRuns(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.ListIntegrationRuns == nil {
 		return toolErrorResult(application.NewInternal("list integration runs use case is not configured", nil)), nil
@@ -162,6 +169,7 @@ func (a *Adapter) handleListIntegrationRuns(ctx context.Context, request mcp.Cal
 	return toolJSONResult(out)
 }
 
+// handleGetLatestIntegrationComparison returns the latest integration comparison.
 func (a *Adapter) handleGetLatestIntegrationComparison(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.GetLatestIntegrationCompare == nil {
 		return toolErrorResult(application.NewInternal("latest integration comparison use case is not configured", nil)), nil
@@ -177,6 +185,7 @@ func (a *Adapter) handleGetLatestIntegrationComparison(ctx context.Context, requ
 	return toolJSONResult(out)
 }
 
+// handleGetIntegrationRun returns a specific integration run.
 func (a *Adapter) handleGetIntegrationRun(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.GetIntegrationRun == nil {
 		return toolErrorResult(application.NewInternal("get integration run use case is not configured", nil)), nil
@@ -196,6 +205,7 @@ func (a *Adapter) handleGetIntegrationRun(ctx context.Context, request mcp.CallT
 	return toolJSONResult(out)
 }
 
+// handleGetIntegrationHeatmap returns grouped integration heatmap data.
 func (a *Adapter) handleGetIntegrationHeatmap(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if a.services.GetIntegrationHeatmap == nil {
 		return toolErrorResult(application.NewInternal("integration heatmap use case is not configured", nil)), nil
@@ -211,6 +221,7 @@ func (a *Adapter) handleGetIntegrationHeatmap(ctx context.Context, request mcp.C
 	return toolJSONResult(out)
 }
 
+// handleIngestCoverageRun ingests a coverage run payload after authenticating write access.
 func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !a.cfg.MCPEnableWriteTools || a.services.IngestCoverageRun == nil {
 		return toolErrorResult(application.NewUnauthenticated("coverage ingest tool is disabled")), nil
@@ -229,6 +240,7 @@ func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallT
 	return toolJSONResult(out)
 }
 
+// handleIngestIntegrationRun ingests an integration run payload after authenticating write access.
 func (a *Adapter) handleIngestIntegrationRun(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if !a.cfg.MCPEnableWriteTools || a.services.IngestIntegrationRun == nil {
 		return toolErrorResult(application.NewUnauthenticated("integration ingest tool is disabled")), nil
@@ -247,6 +259,7 @@ func (a *Adapter) handleIngestIntegrationRun(ctx context.Context, request mcp.Ca
 	return toolJSONResult(out)
 }
 
+// readProjectsResource returns the default projects resource payload.
 func (a *Adapter) readProjectsResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	if a.services.ListProjects == nil {
 		return nil, toolProtocolError(application.NewInternal("list projects use case is not configured", nil))
@@ -258,6 +271,7 @@ func (a *Adapter) readProjectsResource(ctx context.Context, request mcp.ReadReso
 	return jsonResourceContents(resourceProjects, out)
 }
 
+// readIntegrationHeatmapResource returns the default integration heatmap resource payload.
 func (a *Adapter) readIntegrationHeatmapResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	if a.services.GetIntegrationHeatmap == nil {
 		return nil, toolProtocolError(application.NewInternal("integration heatmap use case is not configured", nil))
@@ -269,6 +283,7 @@ func (a *Adapter) readIntegrationHeatmapResource(ctx context.Context, request mc
 	return jsonResourceContents(request.Params.URI, out)
 }
 
+// readProjectResource returns project metadata from a project resource URI.
 func (a *Adapter) readProjectResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	projectID, suffix, err := parseProjectURI(request.Params.URI)
 	if err != nil {
@@ -287,6 +302,7 @@ func (a *Adapter) readProjectResource(ctx context.Context, request mcp.ReadResou
 	return jsonResourceContents(request.Params.URI, out)
 }
 
+// readProjectCoverageResource returns the latest coverage comparison from a project resource URI.
 func (a *Adapter) readProjectCoverageResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	projectID, suffix, err := parseProjectURI(request.Params.URI)
 	if err != nil {
@@ -309,6 +325,7 @@ func (a *Adapter) readProjectCoverageResource(ctx context.Context, request mcp.R
 	return jsonResourceContents(request.Params.URI, coverageComparisonEnvelope{Project: project, Run: out.Run, Comparison: out.Comparison, Packages: out.Packages})
 }
 
+// readProjectIntegrationResource returns the latest integration comparison from a project resource URI.
 func (a *Adapter) readProjectIntegrationResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	projectID, suffix, err := parseProjectURI(request.Params.URI)
 	if err != nil {
@@ -327,6 +344,7 @@ func (a *Adapter) readProjectIntegrationResource(ctx context.Context, request mc
 	return jsonResourceContents(request.Params.URI, out)
 }
 
+// readProjectContributorsResource returns contributor data from a project resource URI.
 func (a *Adapter) readProjectContributorsResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	projectID, suffix, err := parseProjectURI(request.Params.URI)
 	if err != nil {
@@ -345,6 +363,7 @@ func (a *Adapter) readProjectContributorsResource(ctx context.Context, request m
 	return jsonResourceContents(request.Params.URI, out)
 }
 
+// getSummarizeProjectHealthPrompt builds a prompt for a project health summary workflow.
 func (a *Adapter) getSummarizeProjectHealthPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
 	branch := strings.TrimSpace(request.Params.Arguments["branch"])
@@ -356,6 +375,7 @@ func (a *Adapter) getSummarizeProjectHealthPrompt(_ context.Context, request mcp
 	return mcp.NewGetPromptResult("Summarize project health", []mcp.PromptMessage{mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(text))}), nil
 }
 
+// getInvestigateCoverageRegressionPrompt builds a prompt for investigating coverage regressions.
 func (a *Adapter) getInvestigateCoverageRegressionPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
 	branch := strings.TrimSpace(request.Params.Arguments["branch"])
@@ -367,6 +387,7 @@ func (a *Adapter) getInvestigateCoverageRegressionPrompt(_ context.Context, requ
 	return mcp.NewGetPromptResult("Investigate coverage regression", []mcp.PromptMessage{mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(text))}), nil
 }
 
+// getInvestigateIntegrationFailuresPrompt builds a prompt for investigating integration failures.
 func (a *Adapter) getInvestigateIntegrationFailuresPrompt(_ context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	projectID := strings.TrimSpace(request.Params.Arguments["projectId"])
 	environment := strings.TrimSpace(request.Params.Arguments["environment"])
