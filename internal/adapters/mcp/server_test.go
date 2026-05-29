@@ -3,6 +3,7 @@ package mcpadapter
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/arxdsilva/opencoverage/internal/application"
@@ -172,6 +173,56 @@ func TestIngestCoverageRunRequiresAuthentication(t *testing.T) {
 	}
 	if errorBody["code"] != "unauthorized" {
 		t.Fatalf("expected unauthorized code, got %#v", errorBody["code"])
+	}
+}
+
+func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
+	cfg := config.Config{
+		MCPServerName:       "opencoverage",
+		MCPServerVersion:    "test",
+		MCPTransport:        "stdio",
+		MCPMaxPageSize:      100,
+		MCPDefaultRunsLimit: 20,
+		MCPEnableWriteTools: true,
+	}
+
+	s := NewServer(cfg, Services{}, stubAuthenticator{expected: "secret-key"})
+	coverageTool := s.GetTool("ingest_coverage_run")
+	if coverageTool == nil {
+		t.Fatalf("expected ingest_coverage_run tool to be registered")
+	}
+	if _, ok := coverageTool.Tool.InputSchema.Properties["payload"]; !ok {
+		t.Fatalf("expected ingest_coverage_run schema to advertise payload")
+	}
+	coveragePayload, ok := coverageTool.Tool.InputSchema.Properties["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected coverage payload schema to be object, got %T", coverageTool.Tool.InputSchema.Properties["payload"])
+	}
+	coverageRequired, ok := coveragePayload["required"].([]string)
+	if !ok {
+		t.Fatalf("expected coverage payload required list, got %#v", coveragePayload["required"])
+	}
+	if !slices.Contains(coverageRequired, "projectKey") || !slices.Contains(coverageRequired, "packages") {
+		t.Fatalf("expected coverage payload required fields to include projectKey and packages, got %#v", coverageRequired)
+	}
+
+	integrationTool := s.GetTool("ingest_integration_run")
+	if integrationTool == nil {
+		t.Fatalf("expected ingest_integration_run tool to be registered")
+	}
+	if _, ok := integrationTool.Tool.InputSchema.Properties["payload"]; !ok {
+		t.Fatalf("expected ingest_integration_run schema to advertise payload")
+	}
+	integrationPayload, ok := integrationTool.Tool.InputSchema.Properties["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected integration payload schema to be object, got %T", integrationTool.Tool.InputSchema.Properties["payload"])
+	}
+	integrationRequired, ok := integrationPayload["required"].([]string)
+	if !ok {
+		t.Fatalf("expected integration payload required list, got %#v", integrationPayload["required"])
+	}
+	if !slices.Contains(integrationRequired, "projectKey") || !slices.Contains(integrationRequired, "ginkgoReport") {
+		t.Fatalf("expected integration payload required fields to include projectKey and ginkgoReport, got %#v", integrationRequired)
 	}
 }
 

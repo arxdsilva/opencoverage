@@ -198,10 +198,26 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 	if a.cfg.MCPEnableWriteTools {
 		s.AddTool(mcp.NewTool("ingest_coverage_run",
 			mcp.WithDescription("Ingest a coverage run using the existing OpenCoverage payload contract."),
+			mcp.WithObject("payload",
+				mcp.Required(),
+				mcp.Description("Coverage ingest payload."),
+				func(schema map[string]any) {
+					schema["required"] = coverageIngestPayloadRequired()
+				},
+				mcp.Properties(coverageIngestPayloadProperties()),
+			),
 			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.handleIngestCoverageRun)
 		s.AddTool(mcp.NewTool("ingest_integration_run",
 			mcp.WithDescription("Ingest an integration-test run using the existing OpenCoverage payload contract."),
+			mcp.WithObject("payload",
+				mcp.Required(),
+				mcp.Description("Integration ingest payload."),
+				func(schema map[string]any) {
+					schema["required"] = integrationIngestPayloadRequired()
+				},
+				mcp.Properties(integrationIngestPayloadProperties()),
+			),
 			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
 		), a.handleIngestIntegrationRun)
 	}
@@ -467,7 +483,7 @@ func (a *Adapter) handleIngestCoverageRun(ctx context.Context, request mcp.CallT
 		return toolErrorResult(err), nil
 	}
 	var in application.IngestCoverageRunInput
-	if err := request.BindArguments(&in); err != nil {
+	if err := bindPayloadOrArguments(request, &in); err != nil {
 		return toolErrorResult(application.NewInvalidArgument("invalid coverage ingest payload", map[string]any{"error": err.Error()})), nil
 	}
 	out, err := a.services.IngestCoverageRun.Execute(ctx, in)
@@ -485,7 +501,7 @@ func (a *Adapter) handleIngestIntegrationRun(ctx context.Context, request mcp.Ca
 		return toolErrorResult(err), nil
 	}
 	var in application.IngestIntegrationRunInput
-	if err := request.BindArguments(&in); err != nil {
+	if err := bindPayloadOrArguments(request, &in); err != nil {
 		return toolErrorResult(application.NewInvalidArgument("invalid integration ingest payload", map[string]any{"error": err.Error()})), nil
 	}
 	out, err := a.services.IngestIntegrationRun.Execute(ctx, in)
@@ -661,6 +677,18 @@ func (a *Adapter) authenticateWriteRequest(ctx context.Context, request mcp.Call
 	}
 
 	return nil
+}
+
+func bindPayloadOrArguments[T any](request mcp.CallToolRequest, target *T) error {
+	args := request.GetArguments()
+	if payload, ok := args["payload"]; ok {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(encoded, target)
+	}
+	return request.BindArguments(target)
 }
 
 func parseOptionalTime(raw string, field string) (*time.Time, error) {
