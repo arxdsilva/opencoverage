@@ -55,6 +55,11 @@ func integrationIngestPayloadProperties() map[string]any {
 				"ginkgoVersion":    map[string]any{"type": "string"},
 				"suiteDescription": map[string]any{"type": "string"},
 				"suitePath":        map[string]any{"type": "string"},
+				"suiteSucceeded":   map[string]any{"type": "boolean"},
+				"specialSuiteFailureReasons": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "string"},
+				},
 				"specReports": map[string]any{
 					"type":     "array",
 					"minItems": 1,
@@ -65,7 +70,21 @@ func integrationIngestPayloadProperties() map[string]any {
 							"containerHierarchyTexts": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 							"state":                   map[string]any{"type": "string"},
 							"runTime":                 map[string]any{"type": "number"},
-							"failure":                 map[string]any{"type": "object"},
+							"failure": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"message": map[string]any{"type": "string"},
+									"location": map[string]any{
+										"type": "object",
+										"properties": map[string]any{
+											"fileName":   map[string]any{"type": "string"},
+											"lineNumber": map[string]any{"type": "integer"},
+										},
+										"required": []string{"fileName", "lineNumber"},
+									},
+								},
+								"required": []string{"message"},
+							},
 						},
 						"required": []string{"leafNodeText", "state", "runTime"},
 					},

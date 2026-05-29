@@ -224,6 +224,63 @@ func TestWriteToolsAdvertisePayloadSchema(t *testing.T) {
 	if !slices.Contains(integrationRequired, "projectKey") || !slices.Contains(integrationRequired, "ginkgoReport") {
 		t.Fatalf("expected integration payload required fields to include projectKey and ginkgoReport, got %#v", integrationRequired)
 	}
+
+	integrationProperties, ok := integrationPayload["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected integration payload properties map, got %T", integrationPayload["properties"])
+	}
+	ginkgoReport, ok := integrationProperties["ginkgoReport"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected ginkgoReport schema object, got %T", integrationProperties["ginkgoReport"])
+	}
+	ginkgoProperties, ok := ginkgoReport["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected ginkgoReport properties map, got %T", ginkgoReport["properties"])
+	}
+	if _, ok := ginkgoProperties["suiteSucceeded"]; !ok {
+		t.Fatalf("expected ginkgoReport to advertise suiteSucceeded")
+	}
+	if _, ok := ginkgoProperties["specialSuiteFailureReasons"]; !ok {
+		t.Fatalf("expected ginkgoReport to advertise specialSuiteFailureReasons")
+	}
+
+	specReports, ok := ginkgoProperties["specReports"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected specReports schema object, got %T", ginkgoProperties["specReports"])
+	}
+	specItems, ok := specReports["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected specReports items schema object, got %T", specReports["items"])
+	}
+	specProperties, ok := specItems["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected specReports item properties map, got %T", specItems["properties"])
+	}
+	failureSchema, ok := specProperties["failure"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected failure schema object, got %T", specProperties["failure"])
+	}
+	failureProperties, ok := failureSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected failure properties map, got %T", failureSchema["properties"])
+	}
+	if _, ok := failureProperties["message"]; !ok {
+		t.Fatalf("expected failure schema to advertise message")
+	}
+	locationSchema, ok := failureProperties["location"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected failure location schema object, got %T", failureProperties["location"])
+	}
+	locationProperties, ok := locationSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected failure location properties map, got %T", locationSchema["properties"])
+	}
+	if _, ok := locationProperties["fileName"]; !ok {
+		t.Fatalf("expected failure location schema to advertise fileName")
+	}
+	if _, ok := locationProperties["lineNumber"]; !ok {
+		t.Fatalf("expected failure location schema to advertise lineNumber")
+	}
 }
 
 func TestIngestCoverageRunAuthenticatesWithHeader(t *testing.T) {
