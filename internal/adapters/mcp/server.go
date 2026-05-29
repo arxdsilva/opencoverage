@@ -278,43 +278,46 @@ func (a *Adapter) registerPrompts(s *server.MCPServer) {
 
 func (a *Adapter) withToolLogging(name string, next func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		startedAt := time.Now()
 		slog.Info("mcp_tool_handled", "tool", name, "phase", "start")
 		result, err := next(ctx, request)
 		if err != nil {
-			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", err)
+			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", err, "duration_ms", time.Since(startedAt).Milliseconds())
 			return nil, err
 		}
 		if result != nil && result.IsError {
-			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", "tool returned error result")
+			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", "tool returned error result", "duration_ms", time.Since(startedAt).Milliseconds())
 			return result, nil
 		}
-		slog.Info("mcp_tool_handled", "tool", name, "phase", "success")
+		slog.Info("mcp_tool_handled", "tool", name, "phase", "success", "duration_ms", time.Since(startedAt).Milliseconds())
 		return result, nil
 	}
 }
 
 func (a *Adapter) withResourceLogging(name string, next func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error)) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		startedAt := time.Now()
 		slog.Info("mcp_resource_handled", "resource", name, "phase", "start")
 		contents, err := next(ctx, request)
 		if err != nil {
-			slog.Error("mcp_resource_handled", "resource", name, "phase", "error", "error", err)
+			slog.Error("mcp_resource_handled", "resource", name, "phase", "error", "error", err, "duration_ms", time.Since(startedAt).Milliseconds())
 			return nil, err
 		}
-		slog.Info("mcp_resource_handled", "resource", name, "phase", "success")
+		slog.Info("mcp_resource_handled", "resource", name, "phase", "success", "duration_ms", time.Since(startedAt).Milliseconds())
 		return contents, nil
 	}
 }
 
 func (a *Adapter) withPromptLogging(name string, next func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error)) func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		startedAt := time.Now()
 		slog.Info("mcp_prompt_handled", "prompt", name, "phase", "start")
 		result, err := next(ctx, request)
 		if err != nil {
-			slog.Error("mcp_prompt_handled", "prompt", name, "phase", "error", "error", err)
+			slog.Error("mcp_prompt_handled", "prompt", name, "phase", "error", "error", err, "duration_ms", time.Since(startedAt).Milliseconds())
 			return nil, err
 		}
-		slog.Info("mcp_prompt_handled", "prompt", name, "phase", "success")
+		slog.Info("mcp_prompt_handled", "prompt", name, "phase", "success", "duration_ms", time.Since(startedAt).Milliseconds())
 		return result, nil
 	}
 }

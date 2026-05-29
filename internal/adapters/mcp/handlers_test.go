@@ -969,6 +969,31 @@ func (h *logCaptureHandler) messages() []string {
 	return out
 }
 
+func (h *logCaptureHandler) hasDurationFor(message string, phase string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, record := range h.records {
+		if record.Message != message {
+			continue
+		}
+		hasPhase := false
+		hasDuration := false
+		record.Attrs(func(attr slog.Attr) bool {
+			if attr.Key == "phase" && attr.Value.String() == phase {
+				hasPhase = true
+			}
+			if attr.Key == "duration_ms" {
+				hasDuration = true
+			}
+			return true
+		})
+		if hasPhase && hasDuration {
+			return true
+		}
+	}
+	return false
+}
+
 func TestOperationLoggingWrappers(t *testing.T) {
 	capture := &logCaptureHandler{}
 	logger := slog.New(capture)
@@ -1009,6 +1034,15 @@ func TestOperationLoggingWrappers(t *testing.T) {
 	messages := strings.Join(capture.messages(), "\n")
 	if !strings.Contains(messages, "mcp_tool_handled") || !strings.Contains(messages, "mcp_resource_handled") || !strings.Contains(messages, "mcp_prompt_handled") {
 		t.Fatalf("expected wrapper log messages, got %q", messages)
+	}
+	if !capture.hasDurationFor("mcp_tool_handled", "success") || !capture.hasDurationFor("mcp_tool_handled", "error") {
+		t.Fatalf("expected duration_ms on tool success/error logs")
+	}
+	if !capture.hasDurationFor("mcp_resource_handled", "success") {
+		t.Fatalf("expected duration_ms on resource success log")
+	}
+	if !capture.hasDurationFor("mcp_prompt_handled", "success") {
+		t.Fatalf("expected duration_ms on prompt success log")
 	}
 }
 
