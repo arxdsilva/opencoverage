@@ -381,15 +381,33 @@ func toolJSONResult(payload any) (*mcp.CallToolResult, error) {
 }
 
 func toolErrorResult(err error) *mcp.CallToolResult {
-	payload := map[string]any{"error": errorPayload(err)}
-	result := mcp.NewToolResultStructured(payload, fmt.Sprintf("%s: %s", payload["error"].(map[string]any)["code"], payload["error"].(map[string]any)["message"]))
+	errorBody := errorPayload(err)
+	payload := map[string]any{"error": errorBody}
+	result := mcp.NewToolResultStructured(
+		payload,
+		formatErrorSummary(errorBody),
+	)
 	result.IsError = true
 	return result
 }
 
 func toolProtocolError(err error) error {
 	payload := errorPayload(err)
-	return fmt.Errorf("%s: %s", payload["code"], payload["message"])
+	return fmt.Errorf("%s", formatErrorSummary(payload))
+}
+
+func formatErrorSummary(payload map[string]any) string {
+	code, _ := payload["code"].(string)
+	if code == "" {
+		code = "internal"
+	}
+
+	message, _ := payload["message"].(string)
+	if message == "" {
+		message = "internal server error"
+	}
+
+	return fmt.Sprintf("%s: %s", code, message)
 }
 
 func errorPayload(err error) map[string]any {
