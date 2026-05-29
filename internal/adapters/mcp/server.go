@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -131,17 +132,17 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 		mcp.WithDescription("List projects in OpenCoverage."),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
 		mcp.WithInteger("pageSize", mcp.Description("Number of projects per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
-	), a.handleListProjects)
+	), a.withToolLogging("list_projects", a.handleListProjects))
 
 	s.AddTool(mcp.NewTool("get_project",
 		mcp.WithDescription("Fetch project metadata by project ID."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
-	), a.handleGetProject)
+	), a.withToolLogging("get_project", a.handleGetProject))
 
 	s.AddTool(mcp.NewTool("list_branches",
 		mcp.WithDescription("List known branches for a project."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
-	), a.handleListBranches)
+	), a.withToolLogging("list_branches", a.handleListBranches))
 
 	s.AddTool(mcp.NewTool("list_coverage_runs",
 		mcp.WithDescription("List paginated coverage run history for a project."),
@@ -151,19 +152,19 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 		mcp.WithString("to", mcp.Description("Optional RFC3339 upper time bound.")),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
 		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
-	), a.handleListCoverageRuns)
+	), a.withToolLogging("list_coverage_runs", a.handleListCoverageRuns))
 
 	s.AddTool(mcp.NewTool("get_latest_coverage_comparison",
 		mcp.WithDescription("Get the latest coverage comparison for a project."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
 		mcp.WithString("branch", mcp.Description("Optional branch filter for the current run.")),
-	), a.handleGetLatestCoverageComparison)
+	), a.withToolLogging("get_latest_coverage_comparison", a.handleGetLatestCoverageComparison))
 
 	s.AddTool(mcp.NewTool("list_contributors",
 		mcp.WithDescription("List top contributors for the project's default branch."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
 		mcp.WithInteger("limit", mcp.Description("Maximum contributors to return."), mcp.Min(1), mcp.Max(25)),
-	), a.handleListContributors)
+	), a.withToolLogging("list_contributors", a.handleListContributors))
 
 	s.AddTool(mcp.NewTool("list_integration_runs",
 		mcp.WithDescription("List paginated integration-test run history for a project."),
@@ -175,25 +176,25 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 		mcp.WithString("to", mcp.Description("Optional RFC3339 upper time bound.")),
 		mcp.WithInteger("page", mcp.Description("Page number to return."), mcp.Min(1)),
 		mcp.WithInteger("pageSize", mcp.Description("Number of runs per page."), mcp.Min(1), mcp.Max(a.cfg.MCPMaxPageSize)),
-	), a.handleListIntegrationRuns)
+	), a.withToolLogging("list_integration_runs", a.handleListIntegrationRuns))
 
 	s.AddTool(mcp.NewTool("get_latest_integration_comparison",
 		mcp.WithDescription("Get the latest integration-test comparison for a project."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
-	), a.handleGetLatestIntegrationComparison)
+	), a.withToolLogging("get_latest_integration_comparison", a.handleGetLatestIntegrationComparison))
 
 	s.AddTool(mcp.NewTool("get_integration_run",
 		mcp.WithDescription("Get a specific integration-test run and its failed specs."),
 		mcp.WithString("projectId", mcp.Required(), mcp.Description("Project ID.")),
 		mcp.WithString("runId", mcp.Required(), mcp.Description("Integration run ID.")),
-	), a.handleGetIntegrationRun)
+	), a.withToolLogging("get_integration_run", a.handleGetIntegrationRun))
 
 	s.AddTool(mcp.NewTool("get_integration_heatmap",
 		mcp.WithDescription("Get grouped integration heatmap data across projects."),
 		mcp.WithString("branch", mcp.Description("Optional branch filter.")),
 		mcp.WithString("status", mcp.Description("Optional status filter: passed or failed."), mcp.Enum("passed", "failed")),
 		mcp.WithInteger("runsPerProject", mcp.Description("Maximum runs to include per project."), mcp.Min(1), mcp.Max(30)),
-	), a.handleGetIntegrationHeatmap)
+	), a.withToolLogging("get_integration_heatmap", a.handleGetIntegrationHeatmap))
 
 	if a.cfg.MCPEnableWriteTools {
 		s.AddTool(mcp.NewTool("ingest_coverage_run",
@@ -207,7 +208,7 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 				mcp.Properties(coverageIngestPayloadProperties()),
 			),
 			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
-		), a.handleIngestCoverageRun)
+		), a.withToolLogging("ingest_coverage_run", a.handleIngestCoverageRun))
 		s.AddTool(mcp.NewTool("ingest_integration_run",
 			mcp.WithDescription("Ingest an integration-test run using the existing OpenCoverage payload contract."),
 			mcp.WithObject("payload",
@@ -219,7 +220,7 @@ func (a *Adapter) registerTools(s *server.MCPServer) {
 				mcp.Properties(integrationIngestPayloadProperties()),
 			),
 			mcp.WithString("apiKey", mcp.Description("API key for write access. If omitted, the configured API key header is used when available.")),
-		), a.handleIngestIntegrationRun)
+		), a.withToolLogging("ingest_integration_run", a.handleIngestIntegrationRun))
 	}
 }
 
@@ -227,32 +228,32 @@ func (a *Adapter) registerResources(s *server.MCPServer) {
 	s.AddResource(mcp.NewResource(resourceProjects, "Projects",
 		mcp.WithResourceDescription("Default project catalog view."),
 		mcp.WithMIMEType(jsonMIMEType),
-	), a.readProjectsResource)
+	), a.withResourceLogging(resourceProjects, a.readProjectsResource))
 
 	s.AddResource(mcp.NewResource(resourceIntegrationHeatmap, "Integration Heatmap",
 		mcp.WithResourceDescription("Default grouped integration heatmap view."),
 		mcp.WithMIMEType(jsonMIMEType),
-	), a.readIntegrationHeatmapResource)
+	), a.withResourceLogging(resourceIntegrationHeatmap, a.readIntegrationHeatmapResource))
 
 	s.AddResourceTemplate(mcp.NewResourceTemplate(resourceProjectTemplate, "Project",
 		mcp.WithTemplateDescription("Project metadata by project ID."),
 		mcp.WithTemplateMIMEType(jsonMIMEType),
-	), a.readProjectResource)
+	), a.withResourceLogging(resourceProjectTemplate, a.readProjectResource))
 
 	s.AddResourceTemplate(mcp.NewResourceTemplate(resourceProjectCoverageTemplate, "Latest Coverage Comparison",
 		mcp.WithTemplateDescription("Latest coverage comparison for a project."),
 		mcp.WithTemplateMIMEType(jsonMIMEType),
-	), a.readProjectCoverageResource)
+	), a.withResourceLogging(resourceProjectCoverageTemplate, a.readProjectCoverageResource))
 
 	s.AddResourceTemplate(mcp.NewResourceTemplate(resourceProjectIntegrationTemplate, "Latest Integration Comparison",
 		mcp.WithTemplateDescription("Latest integration comparison for a project."),
 		mcp.WithTemplateMIMEType(jsonMIMEType),
-	), a.readProjectIntegrationResource)
+	), a.withResourceLogging(resourceProjectIntegrationTemplate, a.readProjectIntegrationResource))
 
 	s.AddResourceTemplate(mcp.NewResourceTemplate(resourceProjectContributorsTemplate, "Contributors",
 		mcp.WithTemplateDescription("Contributor summary for a project's default branch."),
 		mcp.WithTemplateMIMEType(jsonMIMEType),
-	), a.readProjectContributorsResource)
+	), a.withResourceLogging(resourceProjectContributorsTemplate, a.readProjectContributorsResource))
 }
 
 func (a *Adapter) registerPrompts(s *server.MCPServer) {
@@ -260,19 +261,62 @@ func (a *Adapter) registerPrompts(s *server.MCPServer) {
 		mcp.WithPromptDescription("Guide the client to summarize a project's current health."),
 		mcp.WithArgument("projectId", mcp.RequiredArgument(), mcp.ArgumentDescription("Project ID to inspect.")),
 		mcp.WithArgument("branch", mcp.ArgumentDescription("Optional branch to emphasize for coverage.")),
-	), a.getSummarizeProjectHealthPrompt)
+	), a.withPromptLogging("summarize_project_health", a.getSummarizeProjectHealthPrompt))
 
 	s.AddPrompt(mcp.NewPrompt("investigate_coverage_regression",
 		mcp.WithPromptDescription("Guide the client through a coverage regression investigation."),
 		mcp.WithArgument("projectId", mcp.RequiredArgument(), mcp.ArgumentDescription("Project ID to inspect.")),
 		mcp.WithArgument("branch", mcp.ArgumentDescription("Optional branch to inspect.")),
-	), a.getInvestigateCoverageRegressionPrompt)
+	), a.withPromptLogging("investigate_coverage_regression", a.getInvestigateCoverageRegressionPrompt))
 
 	s.AddPrompt(mcp.NewPrompt("investigate_integration_failures",
 		mcp.WithPromptDescription("Guide the client through an integration failure investigation."),
 		mcp.WithArgument("projectId", mcp.RequiredArgument(), mcp.ArgumentDescription("Project ID to inspect.")),
 		mcp.WithArgument("environment", mcp.ArgumentDescription("Optional environment to focus on.")),
-	), a.getInvestigateIntegrationFailuresPrompt)
+	), a.withPromptLogging("investigate_integration_failures", a.getInvestigateIntegrationFailuresPrompt))
+}
+
+func (a *Adapter) withToolLogging(name string, next func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		slog.Info("mcp_tool_handled", "tool", name, "phase", "start")
+		result, err := next(ctx, request)
+		if err != nil {
+			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", err)
+			return nil, err
+		}
+		if result != nil && result.IsError {
+			slog.Error("mcp_tool_handled", "tool", name, "phase", "error", "error", "tool returned error result")
+			return result, nil
+		}
+		slog.Info("mcp_tool_handled", "tool", name, "phase", "success")
+		return result, nil
+	}
+}
+
+func (a *Adapter) withResourceLogging(name string, next func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error)) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		slog.Info("mcp_resource_handled", "resource", name, "phase", "start")
+		contents, err := next(ctx, request)
+		if err != nil {
+			slog.Error("mcp_resource_handled", "resource", name, "phase", "error", "error", err)
+			return nil, err
+		}
+		slog.Info("mcp_resource_handled", "resource", name, "phase", "success")
+		return contents, nil
+	}
+}
+
+func (a *Adapter) withPromptLogging(name string, next func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error)) func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		slog.Info("mcp_prompt_handled", "prompt", name, "phase", "start")
+		result, err := next(ctx, request)
+		if err != nil {
+			slog.Error("mcp_prompt_handled", "prompt", name, "phase", "error", "error", err)
+			return nil, err
+		}
+		slog.Info("mcp_prompt_handled", "prompt", name, "phase", "success")
+		return result, nil
+	}
 }
 
 func parseOptionalTime(raw string, field string) (*time.Time, error) {
