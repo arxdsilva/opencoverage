@@ -1,0 +1,66 @@
+{
+  "config": {
+    "rootDir": "test/e2e",
+    "version": "1.58.2"
+  },
+  "suites": [
+    {
+      "title": "first title",
+      "specs": [
+        {
+          "title": "first title",
+          "tests": [
+            {
+              "results": [
+                {
+                  "duration": 92
+                }
+              ],
+              "status": "expected"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "title 4",
+      "specs": [],
+      "suites": [
+        {
+          "title": "Title 4",
+          "specs": [
+            {
+              "title": "Title 3",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "duration": 1319
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ]
+            },
+            {
+              "title": "title 5",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "duration": 150277,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 150000ms exceeded.\u001b[39m"
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

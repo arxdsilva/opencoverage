@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Coverage E2E Test Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <main id="appShell" class="app-shell">
+      <aside class="sidebar card">
+        <div class="sidebar-header">
+          <button id="toggleSidebar" class="btn sidebar-toggle" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar" aria-controls="projectSelector projectSearchInput">◂</button>
+          <p class="eyebrow">Open Coverage</p>
+          <h1>E2E Tests</h1>
+          <label class="sidebar-control" for="e2eAutoRefreshInterval">
+            <span class="eyebrow">Auto Refresh</span>
+            <select id="e2eAutoRefreshInterval" class="branch-select sidebar-select">
+              <option value="off">Off</option>
+              <option value="15s">Every 15s</option>
+              <option value="30s">Every 30s</option>
+              <option value="60s">Every 60s</option>
+              <option value="5m">Every 5m</option>
+            </select>
+            <p id="e2eAutoRefreshStatus" class="muted sidebar-help">Auto refresh is off.</p>
+            <div class="auto-refresh-progress" aria-hidden="true">
+              <span id="e2eAutoRefreshProgressBar" class="auto-refresh-progress-bar"></span>
+            </div>
+          </label>
+          <button id="openE2EHeatmap" class="btn">Open Heatmap</button>
+          <a class="btn btn-link" href="/">Back to Home</a>
+          <button id="refreshProjects" class="btn">Refresh</button>
+        </div>
+        <article class="card project-selector-card">
+          <div class="project-selector-head">
+            <p class="eyebrow">Select Project</p>
+          </div>
+          <select id="projectGroupFilter" class="project-select">
+            <option value="__all__">All groups</option>
+          </select>
+          <input
+            id="projectSearchInput"
+            type="text"
+            class="project-search"
+            placeholder="Search projects..."
+            autocomplete="off"
+          />
+          <select id="projectSelector" class="project-select">
+            <option value="">Loading projects...</option>
+          </select>
+        </article>
+      </aside>
+
+      <section class="content content-integration">
+        <section class="integration-screen card">
+          <div class="integration-screen-head">
+            <div>
+              <p class="eyebrow">E2E Tests</p>
+              <h3 id="e2eScreenProjectTitle">Select a project</h3>
+              <p id="e2eScreenProjectMeta" class="muted">No project selected</p>
+            </div>
+          </div>
+
+          <div class="integration-stats-grid">
+            <article class="card stat">
+              <p class="label">Status</p>
+              <p id="e2eStatus" class="value">-</p>
+            </article>
+            <article class="card stat">
+              <p class="label">Run Success Ratio % (Pass/Fail, last 20)</p>
+              <p id="e2ePassRate" class="value">-</p>
+            </article>
+            <article class="card stat">
+              <p class="label">Failed Specs</p>
+              <p id="e2eFailedSpecsCount" class="value">-</p>
+            </article>
+            <article class="card stat">
+              <p class="label">Duration</p>
+              <p id="e2eDuration" class="value">-</p>
+            </article>
+          </div>
+
+          <div class="integration-filters">
+            <select id="e2eBranchFilter" class="branch-select">
+              <option value="">Loading branches...</option>
+            </select>
+            <select id="e2eStatusFilter" class="branch-select">
+              <option value="">All statuses</option>
+              <option value="passed">passed</option>
+              <option value="failed">failed</option>
+            </select>
+            <select id="e2eEnvironmentFilter" class="branch-select">
+              <option value="">All environments</option>
+              <option value="test">test</option>
+              <option value="stage">stage</option>
+              <option value="prod">prod</option>
+              <option value="none">(no env)</option>
+            </select>
+            <select id="e2ePlatformFilter" class="branch-select">
+              <option value="">All platforms</option>
+              <option value="web">web</option>
+              <option value="android">android</option>
+              <option value="ios">ios</option>
+            </select>
+            <button id="e2eReload" class="btn">Reload</button>
+          </div>
+
+          <article class="card integration-chain-card">
+            <div class="integration-chain-head">
+              <h3>Run Chain</h3>
+              <p class="muted">Oldest on the left, newest on the right. Green = pass, red = fail. Showing up to 5 runs.</p>
+            </div>
+            <div id="e2eRunChain" class="integration-run-chain"></div>
+          </article>
+
+          <section class="tables-grid integration-tables-grid">
+            <article class="card table-card">
+              <div class="table-head">
+                <h3>E2E Runs</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>Branch</th>
+                      <th>Commit</th>
+                      <th>Status</th>
+                      <th>Pass Rate</th>
+                      <th>Failed</th>
+                      <th>Platform</th>
+                      <th>Framework</th>
+                      <th>Environment</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="e2eRunsBody"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="card table-card">
+              <div class="table-head">
+                <h3>Failed Specs (Selected Run)</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Spec Path</th>
+                      <th>Message</th>
+                      <th>File</th>
+                      <th>Line</th>
+                    </tr>
+                  </thead>
+                  <tbody id="e2eFailedSpecsBody"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section id="e2eHeatmapOverlay" class="heatmap-overlay" aria-hidden="true">
+            <article class="card integration-heatmap-overlay-card">
+              <div class="heatmap-overlay-head">
+                <div class="table-head heatmap-head">
+                  <h3>E2E Heatmap</h3>
+                  <p class="muted">All projects by group (default branch only). ✅ = pass, ❌ = fail. Hover for details.</p>
+                  <p class="muted heatmap-time-direction">Run order: oldest on the left, newest on the right.</p>
+                </div>
+                <div class="heatmap-overlay-tools integration-heatmap-tools">
+                  <div class="integration-filters">
+                    <select id="heatmapBranchFilter" class="branch-select" disabled>
+                      <option value="">Default branches only</option>
+                    </select>
+                    <select id="heatmapStatusFilter" class="branch-select">
+                      <option value="">All statuses</option>
+                      <option value="passed">passed</option>
+                      <option value="failed">failed</option>
+                    </select>
+                    <button id="heatmapReload" class="btn">Reload</button>
+                    <button id="closeE2EHeatmap" class="btn">Close</button>
+                  </div>
+                </div>
+              </div>
+              <div id="e2eHeatmap" class="integration-heatmap-body integration-heatmap-overlay-body"></div>
+            </article>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/assets/e2e.js"></script>
+  </body>
+</html>

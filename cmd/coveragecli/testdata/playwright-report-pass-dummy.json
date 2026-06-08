@@ -1,0 +1,63 @@
+{
+  "config": {
+    "rootDir": "test/e2e",
+    "version": "1.58.2"
+  },
+  "suites": [
+    {
+      "title": "first title",
+      "specs": [
+        {
+          "title": "first title",
+          "tests": [
+            {
+              "results": [
+                {
+                  "duration": 92
+                }
+              ],
+              "status": "expected"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "title 2",
+      "specs": [],
+      "suites": [
+        {
+          "title": "Title 2",
+          "specs": [
+            {
+              "title": "Title 3",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "duration": 1319
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ]
+            },
+            {
+              "title": "Title 4",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "duration": 2586
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

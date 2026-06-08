@@ -17,14 +17,19 @@ import (
 type Handler struct {
 	ingest                      *application.IngestCoverageRunUseCase
 	ingestIntegration           *application.IngestIntegrationRunUseCase
+	ingestE2E                   *application.IngestE2ERunUseCase
 	listProjects                *application.ListProjectsUseCase
 	getProject                  *application.GetProjectUseCase
 	listRuns                    *application.ListCoverageRunsUseCase
 	listIntegrationRuns         *application.ListIntegrationRunsUseCase
+	listE2ERuns                 *application.ListE2ERunsUseCase
 	latestComparison            *application.GetLatestComparisonUseCase
 	latestIntegrationComparison *application.GetLatestIntegrationComparisonUseCase
+	latestE2EComparison         *application.GetLatestE2EComparisonUseCase
 	getIntegrationRun           *application.GetIntegrationRunUseCase
+	getE2ERun                   *application.GetE2ERunUseCase
 	getIntegrationHeatmap       *application.GetIntegrationHeatmapUseCase
+	getE2EHeatmap               *application.GetE2EHeatmapUseCase
 	listBranches                *application.ListBranchesUseCase
 	listContributors            *application.ListContributorsUseCase
 }
@@ -32,28 +37,38 @@ type Handler struct {
 func NewHandler(
 	ingest *application.IngestCoverageRunUseCase,
 	ingestIntegration *application.IngestIntegrationRunUseCase,
+	ingestE2E *application.IngestE2ERunUseCase,
 	listProjects *application.ListProjectsUseCase,
 	getProject *application.GetProjectUseCase,
 	listRuns *application.ListCoverageRunsUseCase,
 	listIntegrationRuns *application.ListIntegrationRunsUseCase,
+	listE2ERuns *application.ListE2ERunsUseCase,
 	latestComparison *application.GetLatestComparisonUseCase,
+	latestE2EComparison *application.GetLatestE2EComparisonUseCase,
 	latestIntegrationComparison *application.GetLatestIntegrationComparisonUseCase,
 	getIntegrationRun *application.GetIntegrationRunUseCase,
+	getE2ERun *application.GetE2ERunUseCase,
 	getIntegrationHeatmap *application.GetIntegrationHeatmapUseCase,
+	getE2EHeatmap *application.GetE2EHeatmapUseCase,
 	listBranches *application.ListBranchesUseCase,
 	listContributors *application.ListContributorsUseCase,
 ) *Handler {
 	return &Handler{
 		ingest:                      ingest,
 		ingestIntegration:           ingestIntegration,
+		ingestE2E:                   ingestE2E,
 		listProjects:                listProjects,
 		getProject:                  getProject,
 		listRuns:                    listRuns,
 		listIntegrationRuns:         listIntegrationRuns,
+		listE2ERuns:                 listE2ERuns,
 		latestComparison:            latestComparison,
 		latestIntegrationComparison: latestIntegrationComparison,
+		latestE2EComparison:         latestE2EComparison,
 		getIntegrationRun:           getIntegrationRun,
+		getE2ERun:                   getE2ERun,
 		getIntegrationHeatmap:       getIntegrationHeatmap,
+		getE2EHeatmap:               getE2EHeatmap,
 		listBranches:                listBranches,
 		listContributors:            listContributors,
 	}
@@ -140,6 +155,56 @@ func (h *Handler) IngestIntegrationRun(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("operation",
 		"name", "ingest_integration_run",
+		"stage", "success",
+		"request_id", requestID,
+		"project_id", out.Project.ID,
+		"run_id", out.Run.ID,
+		"duration_ms", time.Since(start).Milliseconds(),
+	)
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) IngestE2ERun(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	slog.Info("operation",
+		"name", "ingest_e2e_run",
+		"stage", "start",
+		"request_id", requestID,
+	)
+
+	var in application.IngestE2ERunInput
+	slog.Info("operation",
+		"name", "ingest_e2e_run",
+		"stage", "decoding_input",
+		"e2e_ingest_input", in,
+	)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		slog.Warn("operation",
+			"name", "ingest_e2e_run",
+			"stage", "decode_failed",
+			"request_id", requestID,
+			"error", err,
+		)
+		writeError(w, http.StatusBadRequest, application.NewInvalidArgument("invalid JSON request body", nil))
+		return
+	}
+
+	out, err := h.ingestE2E.Execute(r.Context(), in)
+	if err != nil {
+		slog.Error("operation",
+			"name", "ingest_e2e_run",
+			"stage", "execute_failed",
+			"request_id", requestID,
+			"project_key", in.ProjectKey,
+			"error", err,
+		)
+		writeAppError(w, err)
+		return
+	}
+
+	slog.Info("operation",
+		"name", "ingest_e2e_run",
 		"stage", "success",
 		"request_id", requestID,
 		"project_id", out.Project.ID,
@@ -284,6 +349,58 @@ func (h *Handler) ListIntegrationRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (h *Handler) ListE2ERuns(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	projectID := chi.URLParam(r, "projectId")
+	q := r.URL.Query()
+	slog.Info("operation", "name", "list_e2e_runs", "stage", "start", "request_id", requestID, "project_id", projectID)
+
+	page, _ := strconv.Atoi(q.Get("page"))
+	pageSize, _ := strconv.Atoi(q.Get("pageSize"))
+
+	var from *time.Time
+	if fromRaw := q.Get("from"); fromRaw != "" {
+		parsed, err := time.Parse(time.RFC3339, fromRaw)
+		if err != nil {
+			slog.Warn("operation", "name", "list_e2e_runs", "stage", "validation_failed", "request_id", requestID, "field", "from", "error", err)
+			writeError(w, http.StatusBadRequest, application.NewInvalidArgument("from must be RFC3339", map[string]any{"field": "from"}))
+			return
+		}
+		from = &parsed
+	}
+
+	var to *time.Time
+	if toRaw := q.Get("to"); toRaw != "" {
+		parsed, err := time.Parse(time.RFC3339, toRaw)
+		if err != nil {
+			slog.Warn("operation", "name", "list_e2e_runs", "stage", "validation_failed", "request_id", requestID, "field", "to", "error", err)
+			writeError(w, http.StatusBadRequest, application.NewInvalidArgument("to must be RFC3339", map[string]any{"field": "to"}))
+			return
+		}
+		to = &parsed
+	}
+
+	out, err := h.listE2ERuns.Execute(r.Context(), application.ListE2ERunsInput{
+		ProjectID:   projectID,
+		Branch:      q.Get("branch"),
+		Status:      q.Get("status"),
+		Environment: q.Get("environment"),
+		From:        from,
+		To:          to,
+		Page:        page,
+		PageSize:    pageSize,
+	})
+	if err != nil {
+		slog.Error("operation", "name", "list_e2e_runs", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	slog.Info("operation", "name", "list_e2e_runs", "stage", "success", "request_id", requestID, "project_id", projectID, "items", len(out.Items), "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (h *Handler) GetLatestComparison(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	requestID := chiMiddleware.GetReqID(r.Context())
@@ -320,6 +437,22 @@ func (h *Handler) GetLatestIntegrationComparison(w http.ResponseWriter, r *http.
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (h *Handler) GetLatestE2EComparison(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	projectID := chi.URLParam(r, "projectId")
+	slog.Info("operation", "name", "get_latest_e2e_comparison", "stage", "start", "request_id", requestID, "project_id", projectID)
+	out, err := h.latestE2EComparison.Execute(r.Context(), projectID)
+	if err != nil {
+		slog.Error("operation", "name", "get_latest_e2e_comparison", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	slog.Info("operation", "name", "get_latest_e2e_comparison", "stage", "success", "request_id", requestID, "project_id", projectID, "run_id", out.Run.ID, "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (h *Handler) GetIntegrationRun(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	requestID := chiMiddleware.GetReqID(r.Context())
@@ -335,6 +468,24 @@ func (h *Handler) GetIntegrationRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("operation", "name", "get_integration_run", "stage", "success", "request_id", requestID, "project_id", projectID, "run_id", runID, "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) GetE2ERun(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	projectID := chi.URLParam(r, "projectId")
+	runID := chi.URLParam(r, "runId")
+	slog.Info("operation", "name", "get_e2e_run", "stage", "start", "request_id", requestID, "project_id", projectID, "run_id", runID)
+
+	out, err := h.getE2ERun.Execute(r.Context(), projectID, runID)
+	if err != nil {
+		slog.Error("operation", "name", "get_e2e_run", "stage", "execute_failed", "request_id", requestID, "project_id", projectID, "run_id", runID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	slog.Info("operation", "name", "get_e2e_run", "stage", "success", "request_id", requestID, "project_id", projectID, "run_id", runID, "duration_ms", time.Since(start).Milliseconds())
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -394,6 +545,29 @@ func (h *Handler) GetIntegrationHeatmap(w http.ResponseWriter, r *http.Request) 
 	}
 
 	slog.Info("operation", "name", "get_integration_heatmap", "stage", "success", "request_id", requestID, "groups", len(out.Groups), "duration_ms", time.Since(start).Milliseconds())
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) GetE2EHeatmap(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	requestID := chiMiddleware.GetReqID(r.Context())
+	q := r.URL.Query()
+	runsPerProject, _ := strconv.Atoi(q.Get("runsPerProject"))
+
+	slog.Info("operation", "name", "get_e2e_heatmap", "stage", "start", "request_id", requestID)
+
+	out, err := h.getE2EHeatmap.Execute(r.Context(), application.E2EHeatmapInput{
+		Branch:         q.Get("branch"),
+		Status:         q.Get("status"),
+		RunsPerProject: runsPerProject,
+	})
+	if err != nil {
+		slog.Error("operation", "name", "get_e2e_heatmap", "stage", "execute_failed", "request_id", requestID, "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	slog.Info("operation", "name", "get_e2e_heatmap", "stage", "success", "request_id", requestID, "groups", len(out.Groups), "duration_ms", time.Since(start).Milliseconds())
 	writeJSON(w, http.StatusOK, out)
 }
 

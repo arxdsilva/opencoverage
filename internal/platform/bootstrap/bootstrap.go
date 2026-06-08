@@ -25,6 +25,11 @@ type App struct {
 	ListIntegrationRuns         *application.ListIntegrationRunsUseCase
 	GetLatestComparison         *application.GetLatestComparisonUseCase
 	GetLatestIntegrationCompare *application.GetLatestIntegrationComparisonUseCase
+	IngestE2ERun                *application.IngestE2ERunUseCase
+	ListE2ERuns                 *application.ListE2ERunsUseCase
+	GetLatestE2ECompare         *application.GetLatestE2EComparisonUseCase
+	GetE2ERun                   *application.GetE2ERunUseCase
+	GetE2EHeatmap               *application.GetE2EHeatmapUseCase
 	GetIntegrationRun           *application.GetIntegrationRunUseCase
 	GetIntegrationHeatmap       *application.GetIntegrationHeatmapUseCase
 	ListBranches                *application.ListBranchesUseCase
@@ -54,6 +59,8 @@ func New(ctx context.Context, cfg config.Config, runMigrations bool) (*App, erro
 	packageRepo := postgres.NewPackageCoverageRepository(pool)
 	integrationRunRepo := postgres.NewIntegrationTestRunRepository(pool)
 	integrationSpecRepo := postgres.NewIntegrationSpecResultRepository(pool)
+	e2eRunRepo := postgres.NewE2ETestRunRepository(pool)
+	e2eSpecRepo := postgres.NewE2ESpecResultRepository(pool)
 	txManager := postgres.NewTxManager(pool)
 	authenticator := auth.NewEnvAPIKeyAuthenticator(cfg.APIKeySecret)
 
@@ -71,6 +78,11 @@ func New(ctx context.Context, cfg config.Config, runMigrations bool) (*App, erro
 		ListIntegrationRuns:         application.NewListIntegrationRunsUseCase(integrationRunRepo),
 		GetLatestComparison:         application.NewGetLatestComparisonUseCase(projectRepo, runRepo, packageRepo),
 		GetLatestIntegrationCompare: application.NewGetLatestIntegrationComparisonUseCase(projectRepo, integrationRunRepo, integrationSpecRepo),
+		IngestE2ERun:                application.NewIngestE2ERunUseCase(projectRepo, e2eRunRepo, e2eSpecRepo, txManager, idGenerator, clockAdapter),
+		ListE2ERuns:                 application.NewListE2ERunsUseCase(e2eRunRepo),
+		GetLatestE2ECompare:         application.NewGetLatestE2EComparisonUseCase(projectRepo, e2eRunRepo, e2eSpecRepo),
+		GetE2ERun:                   application.NewGetE2ERunUseCase(e2eRunRepo, e2eSpecRepo),
+		GetE2EHeatmap:               application.NewGetE2EHeatmapUseCase(e2eRunRepo),
 		GetIntegrationRun:           application.NewGetIntegrationRunUseCase(integrationRunRepo, integrationSpecRepo),
 		GetIntegrationHeatmap:       application.NewGetIntegrationHeatmapUseCase(integrationRunRepo),
 		ListBranches:                application.NewListBranchesUseCase(runRepo),

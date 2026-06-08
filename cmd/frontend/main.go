@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-//go:embed web/index.html web/integration.html web/assets/*
+//go:embed web/index.html web/integration.html web/e2eTest.html web/assets/*
 var embeddedFrontend embed.FS
 
 type config struct {
@@ -52,6 +52,8 @@ func main() {
 			serveEmbeddedFile(w, http.FS(frontendFS), "index.html")
 		case "/integration":
 			serveEmbeddedFile(w, http.FS(frontendFS), "integration.html")
+		case "/e2e":
+			serveEmbeddedFile(w, http.FS(frontendFS), "e2eTest.html")
 		default:
 			http.NotFound(w, r)
 		}
@@ -61,6 +63,8 @@ func main() {
 	mux.HandleFunc("/api/projects/", proxyHandler(cfg))
 	mux.HandleFunc("/api/integration-test-runs", proxyHandler(cfg))
 	mux.HandleFunc("/api/integration-test-runs/", proxyHandler(cfg))
+	mux.HandleFunc("/api/e2e-test-runs", proxyHandler(cfg))
+	mux.HandleFunc("/api/e2e-test-runs/", proxyHandler(cfg))
 
 	server := &http.Server{
 		Addr:         cfg.Addr,

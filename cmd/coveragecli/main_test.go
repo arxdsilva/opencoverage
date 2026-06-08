@@ -205,3 +205,203 @@ func TestParseVitestSummary_FromDummyFixture_WithFilters(t *testing.T) {
 		t.Fatalf("unexpected pkg[1]: %+v", pkgs[1])
 	}
 }
+
+func loadTestData(t *testing.T, filename string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", filename))
+	if err != nil {
+		t.Fatalf("failed to read test data %s: %v", filename, err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to parse test data %s: %v", filename, err)
+	}
+	return result
+}
+
+func assertHierarchy(t *testing.T, spec map[string]any, expected []string) {
+	t.Helper()
+	raw, ok := spec["containerHierarchyTexts"].([]any)
+	if !ok {
+		t.Fatalf("containerHierarchyTexts: expected []any, got %T", spec["containerHierarchyTexts"])
+	}
+	if len(raw) != len(expected) {
+		t.Fatalf("hierarchy length: expected %d, got %d (%v)", len(expected), len(raw), raw)
+	}
+	for i, want := range expected {
+		got, ok := raw[i].(string)
+		if !ok {
+			t.Fatalf("hierarchy[%d]: expected string, got %T", i, raw[i])
+		}
+		if got != want {
+			t.Fatalf("hierarchy[%d]: expected %q, got %q", i, want, got)
+		}
+	}
+}
+func TestNormalizePlaywrightReport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normalizes report with all tests passed", func(t *testing.T) {
+		t.Parallel()
+
+		raw := loadTestData(t, "playwright-report-pass-dummy.json")
+		result := normalizePlaywrightReport(raw)
+
+		if result["suiteDescription"] != "first title" {
+			t.Fatalf("field %q: expected %q, got %q", "suiteDescription", "first title", result["suiteDescription"])
+		}
+		if result["suitePath"] != "test/e2e" {
+			t.Fatalf("field %q: expected %q, got %q", "suitePath", "test/e2e", result["suitePath"])
+		}
+		if result["suitePath"] != "test/e2e" {
+			t.Fatalf("field %q: expected %q, got %q", "suitePath", "test/e2e", result["suitePath"])
+		}
+		if result["frameworkVersion"] != "1.58.2" {
+			t.Fatalf("field %q: expected %q, got %q", "frameworkVersion", "1.58.2", result["frameworkVersion"])
+		}
+		if rt, ok := result["reportType"].(*string); !ok || *rt != "playwright" {
+			t.Fatalf("field %q: expected %q, got %v", "reportType", "playwright", result["reportType"])
+		}
+		if tf, ok := result["testFramework"].(*string); !ok || *tf != "playwright" {
+			t.Fatalf("field %q: expected %q, got %v", "testFramework", "playwright", result["testFramework"])
+		}
+
+		specs, ok := result["specReports"].([]map[string]any)
+		if !ok {
+			t.Fatalf("specReports: expected []map[string]any, got %T", result["specReports"])
+		}
+		if len(specs) != 3 {
+			t.Fatalf("expected 3 specs, got %d", len(specs))
+		}
+
+		// Spec 0: top-level suite "first title" > spec "first title"
+		if specs[0]["leafNodeText"] != "first title" {
+			t.Fatalf("spec[0].leafNodeText: expected %q, got %q", "first title", specs[0]["leafNodeText"])
+		}
+		if specs[0]["state"] != "passed" {
+			t.Fatalf("spec[0].state: expected %q, got %q", "passed", specs[0]["state"])
+		}
+
+		assertHierarchy(t, specs[0], []string{"first title"})
+
+		// Spec 1: "title 2" > "Title 2" > spec "Title 3"
+		if specs[1]["leafNodeText"] != "Title 3" {
+			t.Fatalf("spec[1].leafNodeText: expected %q, got %q", "Title 3", specs[1]["leafNodeText"])
+		}
+		if specs[1]["state"] != "passed" {
+			t.Fatalf("spec[1].state: expected %q, got %q", "passed", specs[1]["state"])
+		}
+		assertHierarchy(t, specs[1], []string{"title 2", "Title 2"})
+
+		// Spec 2: "title 2" > "Title 2" > spec "Title 4"
+		if specs[2]["leafNodeText"] != "Title 4" {
+			t.Fatalf("spec[2].leafNodeText: expected %q, got %q", "Title 4", specs[2]["leafNodeText"])
+		}
+		if specs[2]["state"] != "passed" {
+			t.Fatalf("spec[2].state: expected %q, got %q", "passed", specs[2]["state"])
+		}
+		assertHierarchy(t, specs[2], []string{"title 2", "Title 2"})
+
+		// No failures on any spec
+		for i, spec := range specs {
+			if _, hasFailure := spec["failure"]; hasFailure {
+				t.Fatalf("spec[%d] should not have a failure block", i)
+			}
+		}
+	})
+
+	t.Run("normalizes report with failed test and strips ANSI", func(t *testing.T) {
+		t.Parallel()
+
+		raw := loadTestData(t, "playwright-report-fail-dummy.json")
+		result := normalizePlaywrightReport(raw)
+
+		if result["suiteDescription"] != "first title" {
+			t.Fatalf("field %q: expected %q, got %q", "suiteDescription", "first title", result["suiteDescription"])
+		}
+		if result["suitePath"] != "test/e2e" {
+			t.Fatalf("field %q: expected %q, got %q", "suitePath", "test/e2e", result["suitePath"])
+		}
+		if result["frameworkVersion"] != "1.58.2" {
+			t.Fatalf("field %q: expected %q, got %q", "frameworkVersion", "1.58.2", result["frameworkVersion"])
+		}
+		if rt, ok := result["reportType"].(*string); !ok || *rt != "playwright" {
+			t.Fatalf("field %q: expected %q, got %v", "reportType", "playwright", result["reportType"])
+		}
+		if tf, ok := result["testFramework"].(*string); !ok || *tf != "playwright" {
+			t.Fatalf("field %q: expected %q, got %v", "testFramework", "playwright", result["testFramework"])
+		}
+
+		specs, ok := result["specReports"].([]map[string]any)
+		if !ok {
+			t.Fatalf("specReports: expected []map[string]any, got %T", result["specReports"])
+		}
+		if len(specs) != 3 {
+			t.Fatalf("expected 3 specs, got %d", len(specs))
+		}
+
+		// Spec 0: passed
+		if specs[0]["leafNodeText"] != "first title" {
+			t.Fatalf("spec[0].leafNodeText: expected %q, got %q", "first title", specs[0]["leafNodeText"])
+		}
+		if specs[0]["state"] != "passed" {
+			t.Fatalf("spec[0].state: expected %q, got %q", "passed", specs[0]["state"])
+		}
+		if _, hasFailure := specs[0]["failure"]; hasFailure {
+			t.Fatal("passed spec should not have failure")
+		}
+
+		// Spec 1: passed nested
+		if specs[1]["leafNodeText"] != "Title 3" {
+			t.Fatalf("spec[1].leafNodeText: expected %q, got %q", "Title 3", specs[1]["leafNodeText"])
+		}
+		if specs[1]["state"] != "passed" {
+			t.Fatalf("spec[1].state: expected %q, got %q", "passed", specs[1]["state"])
+		}
+		assertHierarchy(t, specs[1], []string{"title 4", "Title 4"})
+
+		// Spec 2: failed with ANSI-stripped error
+		if specs[2]["leafNodeText"] != "title 5" {
+			t.Fatalf("spec[2].leafNodeText: expected %q, got %q", "title 5", specs[2]["leafNodeText"])
+		}
+		if specs[2]["state"] != "failed" {
+			t.Fatalf("spec[2].state: expected %q, got %q", "failed", specs[2]["state"])
+		}
+		assertHierarchy(t, specs[2], []string{"title 4", "Title 4"})
+
+		failureRaw, hasFailure := specs[2]["failure"]
+		if !hasFailure {
+			t.Fatal("failed spec should have a failure block")
+		}
+		failure := failureRaw.(map[string]any)
+		msg := failure["message"].(string)
+		if msg != "Test timeout of 150000ms exceeded." {
+			t.Fatalf("expected ANSI-stripped message, got %q", msg)
+		}
+	})
+}
+
+func TestStripANSI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"strips color codes", "\x1b[31mError\x1b[39m", "Error"},
+		{"strips multiple codes", "\x1b[31m\x1b[1mBold Red\x1b[22m\x1b[39m", "Bold Red"},
+		{"no-op on clean string", "clean message", "clean message"},
+		{"empty string", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := stripANSI(tt.input)
+			if got != tt.want {
+				t.Fatalf("stripANSI(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

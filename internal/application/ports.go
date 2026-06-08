@@ -29,7 +29,7 @@ type PackageCoverageRepository interface {
 	ListByRunID(ctx context.Context, runID string) ([]domain.PackageCoverage, error)
 }
 
-type IntegrationHeatmapRow struct {
+type TestHeatmapRow struct {
 	RunID        string
 	ProjectID    string
 	ProjectName  string
@@ -50,13 +50,28 @@ type IntegrationTestRunRepository interface {
 	GetLatestByProject(ctx context.Context, projectID string) (domain.IntegrationTestRun, error)
 	GetByID(ctx context.Context, projectID string, runID string) (domain.IntegrationTestRun, error)
 	ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.IntegrationTestRun, int, error)
-	HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]IntegrationHeatmapRow, error)
+	HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]TestHeatmapRow, error)
 }
 
 type IntegrationSpecResultRepository interface {
 	CreateBatch(ctx context.Context, specs []domain.IntegrationSpecResult) error
 	ListByRunID(ctx context.Context, runID string) ([]domain.IntegrationSpecResult, error)
 	ListFailedByRunID(ctx context.Context, runID string) ([]domain.IntegrationSpecResult, error)
+}
+
+type E2ETestRunRepository interface {
+	Create(ctx context.Context, run domain.E2ETestRun) (domain.E2ETestRun, error)
+	GetLatestByProjectAndBranch(ctx context.Context, projectID string, branch string) (domain.E2ETestRun, error)
+	GetLatestByProject(ctx context.Context, projectID string) (domain.E2ETestRun, error)
+	GetByID(ctx context.Context, projectID string, runID string) (domain.E2ETestRun, error)
+	ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error)
+	HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]TestHeatmapRow, error)
+}
+
+type E2ESpecResultRepository interface {
+	CreateBatch(ctx context.Context, specs []domain.E2ESpecResult) error
+	ListByRunID(ctx context.Context, runID string) ([]domain.E2ESpecResult, error)
+	ListFailedByRunID(ctx context.Context, runID string) ([]domain.E2ESpecResult, error)
 }
 
 type APIKeyAuthenticator interface {

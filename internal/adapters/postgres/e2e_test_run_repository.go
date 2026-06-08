@@ -13,20 +13,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type IntegrationTestRunRepository struct {
+type E2ETestRunRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewIntegrationTestRunRepository(pool *pgxpool.Pool) *IntegrationTestRunRepository {
-	return &IntegrationTestRunRepository{pool: pool}
+func NewE2ETestRunRepository(pool *pgxpool.Pool) *E2ETestRunRepository {
+	return &E2ETestRunRepository{pool: pool}
 }
 
-func (r *IntegrationTestRunRepository) Create(ctx context.Context, run domain.IntegrationTestRun) (domain.IntegrationTestRun, error) {
+func (r *E2ETestRunRepository) Create(ctx context.Context, run domain.E2ETestRun) (domain.E2ETestRun, error) {
 	q := getQuerier(ctx, r.pool)
 	_, err := q.Exec(ctx, `
-		INSERT INTO integration_test_runs (
+		INSERT INTO e2e_test_runs (
 			id, project_id, branch, commit_sha, author, trigger_type, run_timestamp,
-			ginkgo_version, suite_description, suite_path, total_specs, passed_specs,
+			framework_version, test_framework, platform, suite_description, suite_path, total_specs, passed_specs,
 			failed_specs, skipped_specs, flaked_specs, pending_specs, interrupted,
 			timed_out, duration_ms, status, environment, created_at
 		)
@@ -34,7 +34,7 @@ func (r *IntegrationTestRunRepository) Create(ctx context.Context, run domain.In
 			$1, $2, $3, $4, $5, $6, $7,
 			$8, $9, $10, $11, $12,
 			$13, $14, $15, $16, $17,
-			$18, $19, $20, $21, $22
+			$18, $19, $20, $21, $22, $23, $24
 		)
 	`,
 		run.ID,
@@ -44,7 +44,9 @@ func (r *IntegrationTestRunRepository) Create(ctx context.Context, run domain.In
 		run.Author,
 		run.TriggerType,
 		run.RunTimestamp,
-		run.GinkgoVersion,
+		run.FrameworkVersion,
+		run.TestFramework,
+		run.PlatformType,
 		run.SuiteDescription,
 		run.SuitePath,
 		run.TotalSpecs,
@@ -61,20 +63,20 @@ func (r *IntegrationTestRunRepository) Create(ctx context.Context, run domain.In
 		run.CreatedAt,
 	)
 	if err != nil {
-		return domain.IntegrationTestRun{}, fmt.Errorf("insert integration test run: %w", err)
+		return domain.E2ETestRun{}, fmt.Errorf("insert e2e test run: %w", err)
 	}
 	return run, nil
 }
 
-func (r *IntegrationTestRunRepository) GetLatestByProjectAndBranch(ctx context.Context, projectID string, branch string) (domain.IntegrationTestRun, error) {
+func (r *E2ETestRunRepository) GetLatestByProjectAndBranch(ctx context.Context, projectID string, branch string) (domain.E2ETestRun, error) {
 	q := getQuerier(ctx, r.pool)
-	var run domain.IntegrationTestRun
+	var run domain.E2ETestRun
 	err := q.QueryRow(ctx, `
 		SELECT id, project_id, branch, commit_sha, COALESCE(author, ''), trigger_type, run_timestamp,
-			COALESCE(ginkgo_version, ''), suite_description, suite_path, total_specs, passed_specs,
+			COALESCE(framework_version, ''), COALESCE(test_framework, ''), COALESCE(platform::text, ''), suite_description, suite_path, total_specs, passed_specs,
 			failed_specs, skipped_specs, flaked_specs, pending_specs, interrupted, timed_out,
 			duration_ms, status, environment, created_at
-		FROM integration_test_runs
+		FROM e2e_test_runs
 		WHERE project_id = $1 AND branch = $2
 		ORDER BY run_timestamp DESC, created_at DESC
 		LIMIT 1
@@ -86,7 +88,9 @@ func (r *IntegrationTestRunRepository) GetLatestByProjectAndBranch(ctx context.C
 		&run.Author,
 		&run.TriggerType,
 		&run.RunTimestamp,
-		&run.GinkgoVersion,
+		&run.FrameworkVersion,
+		&run.TestFramework,
+		&run.PlatformType,
 		&run.SuiteDescription,
 		&run.SuitePath,
 		&run.TotalSpecs,
@@ -104,22 +108,22 @@ func (r *IntegrationTestRunRepository) GetLatestByProjectAndBranch(ctx context.C
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.IntegrationTestRun{}, domain.ErrNotFound
+			return domain.E2ETestRun{}, domain.ErrNotFound
 		}
-		return domain.IntegrationTestRun{}, fmt.Errorf("query latest integration run by project and branch: %w", err)
+		return domain.E2ETestRun{}, fmt.Errorf("query latest e2e run by project and branch: %w", err)
 	}
 	return run, nil
 }
 
-func (r *IntegrationTestRunRepository) GetLatestByProject(ctx context.Context, projectID string) (domain.IntegrationTestRun, error) {
+func (r *E2ETestRunRepository) GetLatestByProject(ctx context.Context, projectID string) (domain.E2ETestRun, error) {
 	q := getQuerier(ctx, r.pool)
-	var run domain.IntegrationTestRun
+	var run domain.E2ETestRun
 	err := q.QueryRow(ctx, `
 		SELECT id, project_id, branch, commit_sha, COALESCE(author, ''), trigger_type, run_timestamp,
-			COALESCE(ginkgo_version, ''), suite_description, suite_path, total_specs, passed_specs,
+			COALESCE(framework_version, ''), COALESCE(test_framework, ''), COALESCE(platform::text, ''), suite_description, suite_path, total_specs, passed_specs,
 			failed_specs, skipped_specs, flaked_specs, pending_specs, interrupted, timed_out,
 			duration_ms, status, environment, created_at
-		FROM integration_test_runs
+		FROM e2e_test_runs
 		WHERE project_id = $1
 		ORDER BY run_timestamp DESC, created_at DESC
 		LIMIT 1
@@ -131,7 +135,9 @@ func (r *IntegrationTestRunRepository) GetLatestByProject(ctx context.Context, p
 		&run.Author,
 		&run.TriggerType,
 		&run.RunTimestamp,
-		&run.GinkgoVersion,
+		&run.FrameworkVersion,
+		&run.TestFramework,
+		&run.PlatformType,
 		&run.SuiteDescription,
 		&run.SuitePath,
 		&run.TotalSpecs,
@@ -149,22 +155,22 @@ func (r *IntegrationTestRunRepository) GetLatestByProject(ctx context.Context, p
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.IntegrationTestRun{}, domain.ErrNotFound
+			return domain.E2ETestRun{}, domain.ErrNotFound
 		}
-		return domain.IntegrationTestRun{}, fmt.Errorf("query latest integration run by project: %w", err)
+		return domain.E2ETestRun{}, fmt.Errorf("query latest e2e run by project: %w", err)
 	}
 	return run, nil
 }
 
-func (r *IntegrationTestRunRepository) GetByID(ctx context.Context, projectID string, runID string) (domain.IntegrationTestRun, error) {
+func (r *E2ETestRunRepository) GetByID(ctx context.Context, projectID string, runID string) (domain.E2ETestRun, error) {
 	q := getQuerier(ctx, r.pool)
-	var run domain.IntegrationTestRun
+	var run domain.E2ETestRun
 	err := q.QueryRow(ctx, `
 		SELECT id, project_id, branch, commit_sha, COALESCE(author, ''), trigger_type, run_timestamp,
-			COALESCE(ginkgo_version, ''), suite_description, suite_path, total_specs, passed_specs,
+			COALESCE(framework_version, ''), COALESCE(test_framework, ''), COALESCE(platform::text, ''), suite_description, suite_path, total_specs, passed_specs,
 			failed_specs, skipped_specs, flaked_specs, pending_specs, interrupted, timed_out,
 			duration_ms, status, environment, created_at
-		FROM integration_test_runs
+		FROM e2e_test_runs
 		WHERE project_id = $1 AND id = $2
 		LIMIT 1
 	`, projectID, runID).Scan(
@@ -175,7 +181,9 @@ func (r *IntegrationTestRunRepository) GetByID(ctx context.Context, projectID st
 		&run.Author,
 		&run.TriggerType,
 		&run.RunTimestamp,
-		&run.GinkgoVersion,
+		&run.FrameworkVersion,
+		&run.TestFramework,
+		&run.PlatformType,
 		&run.SuiteDescription,
 		&run.SuitePath,
 		&run.TotalSpecs,
@@ -193,14 +201,14 @@ func (r *IntegrationTestRunRepository) GetByID(ctx context.Context, projectID st
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.IntegrationTestRun{}, domain.ErrNotFound
+			return domain.E2ETestRun{}, domain.ErrNotFound
 		}
-		return domain.IntegrationTestRun{}, fmt.Errorf("query integration run by id: %w", err)
+		return domain.E2ETestRun{}, fmt.Errorf("query e2e run by id: %w", err)
 	}
 	return run, nil
 }
 
-func (r *IntegrationTestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.IntegrationTestRun, int, error) {
+func (r *E2ETestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error) {
 	q := getQuerier(ctx, r.pool)
 	offset := (page - 1) * pageSize
 
@@ -238,18 +246,18 @@ func (r *IntegrationTestRunRepository) ListByProject(ctx context.Context, projec
 		idx++
 	}
 
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM integration_test_runs %s", where)
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM e2e_test_runs %s", where)
 	var total int
 	if err := q.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("count integration runs: %w", err)
+		return nil, 0, fmt.Errorf("count e2e runs: %w", err)
 	}
 
 	listSQL := fmt.Sprintf(`
 		SELECT id, project_id, branch, commit_sha, COALESCE(author, ''), trigger_type, run_timestamp,
-			COALESCE(ginkgo_version, ''), suite_description, suite_path, total_specs, passed_specs,
+			COALESCE(framework_version, ''), COALESCE(test_framework, ''), COALESCE(platform::text, ''), suite_description, suite_path, total_specs, passed_specs,
 			failed_specs, skipped_specs, flaked_specs, pending_specs, interrupted, timed_out,
 			duration_ms, status, environment, created_at
-		FROM integration_test_runs
+		FROM e2e_test_runs
 		%s
 		ORDER BY run_timestamp DESC, created_at DESC
 		LIMIT $%d OFFSET $%d
@@ -258,13 +266,13 @@ func (r *IntegrationTestRunRepository) ListByProject(ctx context.Context, projec
 
 	rows, err := q.Query(ctx, listSQL, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list integration runs: %w", err)
+		return nil, 0, fmt.Errorf("list e2e runs: %w", err)
 	}
 	defer rows.Close()
 
-	runs := make([]domain.IntegrationTestRun, 0)
+	runs := make([]domain.E2ETestRun, 0)
 	for rows.Next() {
-		var run domain.IntegrationTestRun
+		var run domain.E2ETestRun
 		if err := rows.Scan(
 			&run.ID,
 			&run.ProjectID,
@@ -273,7 +281,9 @@ func (r *IntegrationTestRunRepository) ListByProject(ctx context.Context, projec
 			&run.Author,
 			&run.TriggerType,
 			&run.RunTimestamp,
-			&run.GinkgoVersion,
+			&run.FrameworkVersion,
+			&run.TestFramework,
+			&run.PlatformType,
 			&run.SuiteDescription,
 			&run.SuitePath,
 			&run.TotalSpecs,
@@ -289,19 +299,19 @@ func (r *IntegrationTestRunRepository) ListByProject(ctx context.Context, projec
 			&run.Environment,
 			&run.CreatedAt,
 		); err != nil {
-			return nil, 0, fmt.Errorf("scan integration run: %w", err)
+			return nil, 0, fmt.Errorf("scan e2e run: %w", err)
 		}
 		runs = append(runs, run)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterate integration run rows: %w", err)
+		return nil, 0, fmt.Errorf("iterate e2e run rows: %w", err)
 	}
 
 	return runs, total, nil
 }
 
-func (r *IntegrationTestRunRepository) HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]application.TestHeatmapRow, error) {
+func (r *E2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]application.TestHeatmapRow, error) {
 	q := getQuerier(ctx, r.pool)
 
 	where := "WHERE 1=1"
@@ -340,7 +350,7 @@ func (r *IntegrationTestRunRepository) HeatmapData(ctx context.Context, branch s
 					PARTITION BY itr.project_id
 					ORDER BY itr.run_timestamp DESC, itr.created_at DESC
 				) AS rn
-			FROM integration_test_runs itr
+			FROM e2e_test_runs itr
 			JOIN projects p ON p.id = itr.project_id
 			%s
 		)
