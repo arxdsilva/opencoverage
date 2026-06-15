@@ -12,6 +12,7 @@ const e2eBranchFilter = document.getElementById('e2eBranchFilter');
 const e2eStatusFilter = document.getElementById('e2eStatusFilter');
 const e2eEnvironmentFilter = document.getElementById('e2eEnvironmentFilter');
 const e2ePlatformFilter = document.getElementById('e2ePlatformFilter');
+const e2eSpecTypeFilter = document.getElementById('e2eSpecTypeFilter');
 const e2eReload = document.getElementById('e2eReload');
 const e2eAutoRefreshInterval = document.getElementById('e2eAutoRefreshInterval');
 const e2eAutoRefreshStatus = document.getElementById('e2eAutoRefreshStatus');
@@ -80,6 +81,9 @@ e2eEnvironmentFilter.addEventListener('change', async () => {
   await loadE2ERuns(selectedProjectId);
 });
 e2ePlatformFilter.addEventListener('change', async () => {
+  await loadE2ERuns(selectedProjectId);
+});
+e2eSpecTypeFilter.addEventListener('change', async () => {
   await loadE2ERuns(selectedProjectId);
 });
 e2eReload.addEventListener('click', async () => {
@@ -610,6 +614,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     const selectedStatus = e2eStatusFilter.value || '';
     const selectedEnvironment = e2eEnvironmentFilter.value || '';
     const selectedPlatform = e2ePlatformFilter.value || '';
+    const selectedSpecType = e2eSpecTypeFilter.value || '';
     url.searchParams.set('branch', selectedBranch);
     if (selectedStatus) {
       url.searchParams.set('status', selectedStatus);
@@ -619,6 +624,9 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     }
     if (selectedPlatform) {
       url.searchParams.set('platform', selectedPlatform);
+    }
+    if (selectedSpecType) {
+      url.searchParams.set('specType', selectedSpecType);
     }
 
     const res = await fetch(url.toString());
@@ -632,7 +640,8 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     const currentStatus = e2eStatusFilter.value || '';
     const currentEnvironment = e2eEnvironmentFilter.value || '';
     const currentPlatform = e2ePlatformFilter.value || '';
-    if (currentBranch !== selectedBranch || currentStatus !== selectedStatus || currentEnvironment !== selectedEnvironment || currentPlatform !== selectedPlatform) return;
+    const currentSpecType = e2eSpecTypeFilter.value || '';
+    if (currentBranch !== selectedBranch || currentStatus !== selectedStatus || currentEnvironment !== selectedEnvironment || currentPlatform !== selectedPlatform || currentSpecType !== selectedSpecType) return;
 
     currentE2ERunItems = items;
     const passedRuns = items.filter((run) => run.status === 'passed').length;
@@ -698,7 +707,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     selectedE2ERunId = null;
     e2eRunChain.innerHTML = `<p class="muted">${err.message}</p>`;
     e2eRunsBody.innerHTML = `<tr><td colspan="10" class="muted">${err.message}</td></tr>`;
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">Failed to load selected run details.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">Failed to load selected run details.</td></tr>';
     e2ePassRate.textContent = '-';
   }
 }
@@ -779,16 +788,24 @@ async function loadE2ERunDetails(projectId, runId) {
     if (!res.ok) throw new Error(`failed to load E2E run details (${res.status})`);
     const data = await res.json();
     const failedSpecs = data.failedSpecs || [];
+    const selectedSpecType = e2eSpecTypeFilter.value;
+    const filtered = selectedSpecType
+      ? failedSpecs.filter(s => s.specType === selectedSpecType)
+      : failedSpecs;
 
-    if (failedSpecs.length === 0) {
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No failed specs for this run.</td></tr>';
+    if (filtered.length === 0) {
+      const msg = failedSpecs.length === 0
+        ? 'No failed specs for this run.'
+        : `No failed specs matching spec type "${escapeHtml(selectedSpecType)}".`;
+      e2eFailedSpecsBody.innerHTML = `<tr><td colspan="5" class="muted">${msg}</td></tr>`;
       return;
     }
 
-    for (const failed of failedSpecs) {
+    for (const failed of filtered) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="code">${escapeHtml(failed.specPath || '-')}</td>
+        <td>${escapeHtml(failed.specType || '-')}</td>
         <td>${escapeHtml(failed.failureMessage || '-')}</td>
         <td class="code">${escapeHtml(failed.file || '-')}</td>
         <td>${failed.line || '-'}</td>
@@ -796,7 +813,7 @@ async function loadE2ERunDetails(projectId, runId) {
       e2eFailedSpecsBody.appendChild(tr);
     }
   } catch (err) {
-    e2eFailedSpecsBody.innerHTML = `<tr><td colspan="4" class="muted">${err.message}</td></tr>`;
+    e2eFailedSpecsBody.innerHTML = `<tr><td colspan="5" class="muted">${err.message}</td></tr>`;
   }
 }
 

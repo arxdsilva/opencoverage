@@ -386,6 +386,7 @@ func (h *Handler) ListE2ERuns(w http.ResponseWriter, r *http.Request) {
 		Branch:      q.Get("branch"),
 		Status:      q.Get("status"),
 		Environment: q.Get("environment"),
+		SpecType:    q.Get("specType"),
 		From:        from,
 		To:          to,
 		Page:        page,

@@ -64,7 +64,7 @@ type E2ETestRunRepository interface {
 	GetLatestByProjectAndBranch(ctx context.Context, projectID string, branch string) (domain.E2ETestRun, error)
 	GetLatestByProject(ctx context.Context, projectID string) (domain.E2ETestRun, error)
 	GetByID(ctx context.Context, projectID string, runID string) (domain.E2ETestRun, error)
-	ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error)
+	ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, specType string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error)
 	HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]TestHeatmapRow, error)
 }
 

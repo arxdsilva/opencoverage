@@ -83,6 +83,7 @@ type IntegrationComparisonResponse struct {
 
 type FailedSpecResponse struct {
 	SpecPath       string `json:"specPath"`
+	SpecType       string `json:"specType,omitempty"`
 	FailureMessage string `json:"failureMessage"`
 	File           string `json:"file,omitempty"`
 	Line           int    `json:"line,omitempty"`

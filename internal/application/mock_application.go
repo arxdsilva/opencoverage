@@ -73,7 +73,7 @@ func (s *stubE2ETestRunRepository) GetByID(ctx context.Context, projectID string
 	return *s.byID, nil
 }
 
-func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error) {
+func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, specType string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error) {
 	s.capturedBranch = branch
 	s.capturedStatus = status
 	if s.listErr != nil {

@@ -41,6 +41,7 @@ type IngestSpecReport struct {
 	LeafNodeText            string             `json:"leafNodeText"`
 	ContainerHierarchyTexts []string           `json:"containerHierarchyTexts"`
 	State                   string             `json:"state"`
+	SpecType                string             `json:"specType,omitempty"`
 	RunTime                 float64            `json:"runTime"`
 	Failure                 *IngestTestFailure `json:"failure,omitempty"`
 }
@@ -292,6 +293,7 @@ func (uc *IngestE2ERunUseCase) buildE2EEntities(projectID string, in IngestE2ERu
 			SpecPath:            specPath,
 			LeafNodeText:        spec.LeafNodeText,
 			State:               normalizedState,
+			SpecType:            spec.SpecType,
 			DurationMS:          durationMS,
 			FailureMessage:      failureMessage,
 			FailureLocationFile: failureFile,
@@ -375,6 +377,9 @@ func validateE2EIngestInput(in IngestE2ERunInput) error {
 		if normalizeTestState(spec.State) == domain.E2ESpecStateFailed && (spec.Failure == nil || strings.TrimSpace(spec.Failure.Message) == "") {
 			return NewInvalidArgument("failure.message is required when state is failed", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].failure.message", i)})
 		}
+		if spec.SpecType != "" && spec.SpecType != "happyPath" && spec.SpecType != "negativePath" {
+			return NewInvalidArgument("specType must be happyPath or negativePath", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].specType", i)})
+		}
 	}
 
 	return nil
@@ -446,7 +451,7 @@ func failedE2ESpecsFromResults(specs []domain.E2ESpecResult) []FailedSpecRespons
 		if spec.State != domain.E2ESpecStateFailed && spec.State != domain.E2ESpecStateFlaky {
 			continue
 		}
-		failed := FailedSpecResponse{SpecPath: spec.SpecPath}
+		failed := FailedSpecResponse{SpecPath: spec.SpecPath, SpecType: string(spec.SpecType)}
 		if spec.FailureMessage != nil {
 			failed.FailureMessage = *spec.FailureMessage
 		}
@@ -467,6 +472,7 @@ type ListE2ERunsInput struct {
 	Branch      string
 	Status      string
 	Environment string
+	SpecType    string
 	From        *time.Time
 	To          *time.Time
 	Page        int
@@ -518,8 +524,12 @@ func (uc *ListE2ERunsUseCase) Execute(ctx context.Context, in ListE2ERunsInput) 
 	if environment != "" && environment != "test" && environment != "stage" && environment != "prod" {
 		return ListE2ERunsOutput{}, NewInvalidArgument("environment must be one of: test, stage, prod", map[string]any{"field": "environment"})
 	}
+	specType := strings.TrimSpace(in.SpecType)
+	if specType != "" && specType != "happyPath" && specType != "negativePath" {
+		return ListE2ERunsOutput{}, NewInvalidArgument("specType must be happyPath or negativePath", map[string]any{"field": "specType"})
+	}
 
-	runs, total, err := uc.runs.ListByProject(ctx, in.ProjectID, in.Branch, status, environment, in.From, in.To, page, pageSize)
+	runs, total, err := uc.runs.ListByProject(ctx, in.ProjectID, in.Branch, status, environment, specType, in.From, in.To, page, pageSize)
 	if err != nil {
 		return ListE2ERunsOutput{}, NewInternal("failed to list E2E runs", err)
 	}
