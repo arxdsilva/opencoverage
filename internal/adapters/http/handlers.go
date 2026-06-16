@@ -560,6 +560,7 @@ func (h *Handler) GetE2EHeatmap(w http.ResponseWriter, r *http.Request) {
 	out, err := h.getE2EHeatmap.Execute(r.Context(), application.E2EHeatmapInput{
 		Branch:         q.Get("branch"),
 		Status:         q.Get("status"),
+		SpecType:       q.Get("specType"),
 		RunsPerProject: runsPerProject,
 	})
 	if err != nil {

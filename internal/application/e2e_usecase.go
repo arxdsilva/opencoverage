@@ -119,6 +119,13 @@ func NewIngestE2ERunUseCase(
 	}
 }
 
+var validSpecTypes = map[string]bool{
+	"":             true,
+	"happyPath":    true,
+	"negativePath": true,
+	"setup":        true,
+}
+
 func (uc *IngestE2ERunUseCase) Execute(ctx context.Context, in IngestE2ERunInput) (IngestE2ERunOutput, error) {
 	if err := validateE2EIngestInput(in); err != nil {
 		return IngestE2ERunOutput{}, err
@@ -377,8 +384,9 @@ func validateE2EIngestInput(in IngestE2ERunInput) error {
 		if normalizeTestState(spec.State) == domain.E2ESpecStateFailed && (spec.Failure == nil || strings.TrimSpace(spec.Failure.Message) == "") {
 			return NewInvalidArgument("failure.message is required when state is failed", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].failure.message", i)})
 		}
-		if spec.SpecType != "" && spec.SpecType != "happyPath" && spec.SpecType != "negativePath" {
-			return NewInvalidArgument("specType must be happyPath or negativePath", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].specType", i)})
+
+		if !validSpecTypes[spec.SpecType] {
+			return NewInvalidArgument("specType must be happyPath, negativePath, or setup", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].specType", i)})
 		}
 	}
 
@@ -525,8 +533,9 @@ func (uc *ListE2ERunsUseCase) Execute(ctx context.Context, in ListE2ERunsInput) 
 		return ListE2ERunsOutput{}, NewInvalidArgument("environment must be one of: test, stage, prod", map[string]any{"field": "environment"})
 	}
 	specType := strings.TrimSpace(in.SpecType)
-	if specType != "" && specType != "happyPath" && specType != "negativePath" {
-		return ListE2ERunsOutput{}, NewInvalidArgument("specType must be happyPath or negativePath", map[string]any{"field": "specType"})
+
+	if !validSpecTypes[specType] {
+		return ListE2ERunsOutput{}, NewInvalidArgument("specType must be happyPath, negativePath, or setup", map[string]any{"field": "specType"})
 	}
 
 	runs, total, err := uc.runs.ListByProject(ctx, in.ProjectID, in.Branch, status, environment, specType, in.From, in.To, page, pageSize)
@@ -670,6 +679,7 @@ func (uc *GetE2ERunUseCase) Execute(ctx context.Context, projectID string, runID
 type E2EHeatmapInput struct {
 	Branch         string
 	Status         string
+	SpecType       string
 	RunsPerProject int
 }
 
@@ -699,7 +709,12 @@ func (uc *GetE2EHeatmapUseCase) Execute(ctx context.Context, in E2EHeatmapInput)
 		return GetE2EHeatmapOutput{}, NewInvalidArgument("status must be passed or failed", map[string]any{"field": "status"})
 	}
 
-	rows, err := uc.runs.HeatmapData(ctx, in.Branch, status, runsPerProject)
+	spec_type := strings.TrimSpace(in.SpecType)
+	if !validSpecTypes[spec_type] {
+		return GetE2EHeatmapOutput{}, NewInvalidArgument("specType must be happyPath, negativePath, or setup", map[string]any{"field": "specType"})
+	}
+
+	rows, err := uc.runs.HeatmapData(ctx, in.Branch, status, spec_type, runsPerProject)
 	if err != nil {
 		return GetE2EHeatmapOutput{}, NewInternal("failed to load heatmap data", err)
 	}

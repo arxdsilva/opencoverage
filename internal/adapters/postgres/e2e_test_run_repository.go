@@ -316,7 +316,7 @@ func (r *E2ETestRunRepository) ListByProject(ctx context.Context, projectID stri
 	return runs, total, nil
 }
 
-func (r *E2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]application.TestHeatmapRow, error) {
+func (r *E2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, specType string, runsPerProject int) ([]application.TestHeatmapRow, error) {
 	q := getQuerier(ctx, r.pool)
 
 	where := "WHERE 1=1"
@@ -331,6 +331,11 @@ func (r *E2ETestRunRepository) HeatmapData(ctx context.Context, branch string, s
 	if status != "" {
 		where += fmt.Sprintf(" AND itr.status = $%d", idx)
 		args = append(args, status)
+		idx++
+	}
+	if specType != "" {
+		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM e2e_test_spec_results s WHERE s.e2e_run_id = itr.id AND s.spec_type = $%d)", idx)
+		args = append(args, specType)
 		idx++
 	}
 

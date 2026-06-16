@@ -672,9 +672,11 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 						}
 
 						// save the spec_type
-						// spec_type can be either happyPath or negativePath
+						// spec_type can be either setup, happyPath or negativePath
 						spec_type = firstString(testMap, "projectId")
-						if strings.Contains(file, "happyPath") || strings.Contains(file, "setup") {
+						if strings.Contains(file, "setup") {
+							spec_type = "setup"
+						} else if strings.Contains(file, "happyPath") {
 							spec_type = "happyPath"
 						} else if strings.Contains(file, "negativePath") {
 							spec_type = "negativePath"

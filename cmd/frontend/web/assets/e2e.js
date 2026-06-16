@@ -25,6 +25,7 @@ const closeE2EHeatmap = document.getElementById('closeE2EHeatmap');
 const e2eHeatmapOverlay = document.getElementById('e2eHeatmapOverlay');
 const heatmapBranchFilter = document.getElementById('heatmapBranchFilter');
 const heatmapStatusFilter = document.getElementById('heatmapStatusFilter');
+const heatmapSpecTypeFilter = document.getElementById('heatmapSpecTypeFilter');
 const heatmapReload = document.getElementById('heatmapReload');
 const e2eHeatmap = document.getElementById('e2eHeatmap');
 const appShell = document.getElementById('appShell');
@@ -103,6 +104,9 @@ heatmapBranchFilter.addEventListener('change', async () => {
   await loadHeatmap();
 });
 heatmapStatusFilter.addEventListener('change', async () => {
+  await loadHeatmap();
+});
+heatmapSpecTypeFilter.addEventListener('change', async () => {
   await loadHeatmap();
 });
 heatmapReload.addEventListener('click', async () => {
@@ -861,6 +865,7 @@ async function loadHeatmap() {
     url.searchParams.set('runsPerProject', '10');
     if (heatmapBranchFilter.value) url.searchParams.set('branch', heatmapBranchFilter.value);
     if (heatmapStatusFilter.value) url.searchParams.set('status', heatmapStatusFilter.value);
+    if (heatmapSpecTypeFilter.value) url.searchParams.set('specType', heatmapSpecTypeFilter.value);
 
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error(`heatmap request failed (${res.status})`);

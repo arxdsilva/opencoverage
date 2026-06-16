@@ -1,7 +1,7 @@
 -- +goose Up
 
 ALTER TABLE e2e_test_spec_results
-  ADD COLUMN spec_type TEXT CHECK (spec_type IN ('happyPath', 'negativePath'));
+  ADD COLUMN spec_type TEXT CHECK (spec_type IN ('setup', 'happyPath', 'negativePath')) ;
 
 CREATE INDEX IF NOT EXISTS e2e_test_spec_results_spec_type_idx
   ON e2e_test_spec_results(e2e_run_id, spec_type) ;

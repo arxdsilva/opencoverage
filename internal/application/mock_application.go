@@ -82,7 +82,7 @@ func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID 
 	return s.listed, s.listTotal, nil
 }
 
-func (s *stubE2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]TestHeatmapRow, error) {
+func (s *stubE2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, specType string, runsPerProject int) ([]TestHeatmapRow, error) {
 	s.capturedBranch = branch
 	s.capturedStatus = status
 	if s.heatmapErr != nil {
