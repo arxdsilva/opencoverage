@@ -52,6 +52,7 @@ type E2ESpecResult struct {
 	SpecPath            string
 	LeafNodeText        string
 	State               E2ESpecState
+	SpecType            string
 	DurationMS          int64
 	FailureMessage      *string
 	FailureLocationFile *string

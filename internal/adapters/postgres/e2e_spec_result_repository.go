@@ -26,9 +26,9 @@ func (r *E2ESpecResultRepository) CreateBatch(ctx context.Context, specs []domai
 		_, err := q.Exec(ctx, `
 			INSERT INTO e2e_test_spec_results (
 				id, e2e_run_id, spec_path, leaf_node_text, state, duration_ms,
-				failure_message, failure_location_file, failure_location_line
+				failure_message, failure_location_file, failure_location_line, spec_type
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`,
 			spec.ID,
 			spec.E2ETestRunID,
@@ -39,6 +39,7 @@ func (r *E2ESpecResultRepository) CreateBatch(ctx context.Context, specs []domai
 			spec.FailureMessage,
 			spec.FailureLocationFile,
 			spec.FailureLocationLine,
+			spec.SpecType,
 		)
 		if err != nil {
 			return fmt.Errorf("insert e2e spec result: %w", err)
@@ -52,7 +53,7 @@ func (r *E2ESpecResultRepository) ListByRunID(ctx context.Context, runID string)
 	q := getQuerier(ctx, r.pool)
 	rows, err := q.Query(ctx, `
 		SELECT id, e2e_run_id, spec_path, leaf_node_text, state, duration_ms,
-			failure_message, failure_location_file, failure_location_line
+			failure_message, failure_location_file, failure_location_line, spec_type
 		FROM e2e_test_spec_results
 		WHERE e2e_run_id = $1
 		ORDER BY spec_path ASC
@@ -75,6 +76,7 @@ func (r *E2ESpecResultRepository) ListByRunID(ctx context.Context, runID string)
 			&spec.FailureMessage,
 			&spec.FailureLocationFile,
 			&spec.FailureLocationLine,
+			&spec.SpecType,
 		); err != nil {
 			return nil, fmt.Errorf("scan e2e spec result: %w", err)
 		}
@@ -92,7 +94,7 @@ func (r *E2ESpecResultRepository) ListFailedByRunID(ctx context.Context, runID s
 	q := getQuerier(ctx, r.pool)
 	rows, err := q.Query(ctx, `
 		SELECT id, e2e_run_id, spec_path, leaf_node_text, state, duration_ms,
-			failure_message, failure_location_file, failure_location_line
+			failure_message, failure_location_file, failure_location_line, spec_type 
 		FROM e2e_test_spec_results
 		WHERE e2e_run_id = $1 AND state IN ('failed', 'flaky')
 		ORDER BY spec_path ASC
@@ -115,6 +117,7 @@ func (r *E2ESpecResultRepository) ListFailedByRunID(ctx context.Context, runID s
 			&spec.FailureMessage,
 			&spec.FailureLocationFile,
 			&spec.FailureLocationLine,
+			&spec.SpecType,
 		); err != nil {
 			return nil, fmt.Errorf("scan failed e2e spec result: %w", err)
 		}
