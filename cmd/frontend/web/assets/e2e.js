@@ -653,9 +653,9 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     if (passedRuns === 0 && failedRuns === 0) {
       e2ePassRate.textContent = '-';
     } else if (failedRuns === 0) {
-      e2ePassRate.textContent = '∞%';
+      e2ePassRate.textContent = '100%';
     } else {
-      e2ePassRate.textContent = `${((passedRuns / failedRuns) * 100).toFixed(2)}%`;
+      e2ePassRate.textContent = `${((passedRuns / (passedRuns + failedRuns)) * 100).toFixed(2)}%`;
     }
 
     if (items.length === 0) {
