@@ -792,20 +792,12 @@ async function loadE2ERunDetails(projectId, runId) {
     if (!res.ok) throw new Error(`failed to load E2E run details (${res.status})`);
     const data = await res.json();
     const failedSpecs = data.failedSpecs || [];
-    const selectedSpecType = e2eSpecTypeFilter.value;
-    const filtered = selectedSpecType
-      ? failedSpecs.filter(s => s.specType === selectedSpecType)
-      : failedSpecs;
-
-    if (filtered.length === 0) {
-      const msg = failedSpecs.length === 0
-        ? 'No failed specs for this run.'
-        : `No failed specs matching spec type "${escapeHtml(selectedSpecType)}".`;
-      e2eFailedSpecsBody.innerHTML = `<tr><td colspan="5" class="muted">${msg}</td></tr>`;
+    if (failedSpecs.length === 0) {
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No failed specs for this run.</td></tr>';
       return;
     }
 
-    for (const failed of filtered) {
+     for (const failed of failedSpecs) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="code">${escapeHtml(failed.specPath || '-')}</td>

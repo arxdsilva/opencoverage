@@ -53,8 +53,7 @@ func (r *E2ESpecResultRepository) ListByRunID(ctx context.Context, runID string)
 	q := getQuerier(ctx, r.pool)
 	rows, err := q.Query(ctx, `
 		SELECT id, e2e_run_id, spec_path, leaf_node_text, state, duration_ms,
-			failure_message, failure_location_file, failure_location_line,
-			COALESCE(spec_type, 'happyPath') AS spec_type
+			failure_message, failure_location_file, failure_location_line, spec_type
 		FROM e2e_test_spec_results
 		WHERE e2e_run_id = $1
 		ORDER BY spec_path ASC
@@ -95,8 +94,7 @@ func (r *E2ESpecResultRepository) ListFailedByRunID(ctx context.Context, runID s
 	q := getQuerier(ctx, r.pool)
 	rows, err := q.Query(ctx, `
 		SELECT id, e2e_run_id, spec_path, leaf_node_text, state, duration_ms,
-			failure_message, failure_location_file, failure_location_line,
-			COALESCE(spec_type, 'happyPath') AS spec_type
+			failure_message, failure_location_file, failure_location_line, spec_type 
 		FROM e2e_test_spec_results
 		WHERE e2e_run_id = $1 AND state IN ('failed', 'flaky')
 		ORDER BY spec_path ASC
