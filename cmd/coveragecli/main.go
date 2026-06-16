@@ -671,20 +671,21 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 							}
 						}
 
-						// save the spec_type
 						// spec_type can be either setup, happyPath or negativePath
-						spec_type = firstString(testMap, "projectId")
-						if strings.Contains(file, "setup") {
-							spec_type = "setup"
-						} else if strings.Contains(file, "happyPath") {
-							spec_type = "happyPath"
-						} else if strings.Contains(file, "negativePath") {
-							spec_type = "negativePath"
-						} else if firstString(testMap, "projectId") == "happyPath" || firstString(testMap, "projectId") == "negativePath" {
-							spec_type = firstString(testMap, "projectId")
-						}
+						// checks if the file name contains "setup", "happyPath" or "negativePath" to determine the spec_type
+						// fall back to checking the projectId
+						projectID := firstString(testMap, "projectId")
 
-						fmt.Println("spec_type: ", spec_type)
+						switch {
+						case strings.Contains(file, "setup"):
+							spec_type = "setup"
+						case strings.Contains(file, "happyPath"):
+							spec_type = "happyPath"
+						case strings.Contains(file, "negativePath"):
+							spec_type = "negativePath"
+						default:
+							spec_type = projectID
+						}
 					}
 				}
 
