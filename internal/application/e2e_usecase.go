@@ -385,7 +385,8 @@ func validateE2EIngestInput(in IngestE2ERunInput) error {
 			return NewInvalidArgument("failure.message is required when state is failed", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].failure.message", i)})
 		}
 
-		if !validSpecTypes[spec.SpecType] {
+		specType := strings.TrimSpace(spec.SpecType)
+		if !validSpecTypes[specType] {
 			return NewInvalidArgument("specType must be happyPath, negativePath, or setup", map[string]any{"field": fmt.Sprintf("testReport.specReports[%d].specType", i)})
 		}
 	}
@@ -709,12 +710,12 @@ func (uc *GetE2EHeatmapUseCase) Execute(ctx context.Context, in E2EHeatmapInput)
 		return GetE2EHeatmapOutput{}, NewInvalidArgument("status must be passed or failed", map[string]any{"field": "status"})
 	}
 
-	spec_type := strings.TrimSpace(in.SpecType)
-	if !validSpecTypes[spec_type] {
-		return GetE2EHeatmapOutput{}, NewInvalidArgument("specType must be happyPath, negativePath, or setup", map[string]any{"field": "specType"})
+	specType := strings.TrimSpace(in.SpecType)
+	if !validSpecTypes[specType] {
+		return GetE2EHeatmapOutput{}, NewInvalidArgument("specType must be one of: happyPath, negativePath, setup (or empty)", map[string]any{"field": "specType"})
 	}
 
-	rows, err := uc.runs.HeatmapData(ctx, in.Branch, status, spec_type, runsPerProject)
+	rows, err := uc.runs.HeatmapData(ctx, in.Branch, status, specType, runsPerProject)
 	if err != nil {
 		return GetE2EHeatmapOutput{}, NewInternal("failed to load heatmap data", err)
 	}

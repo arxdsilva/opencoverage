@@ -81,6 +81,7 @@ func TestIngestE2ERunUseCaseExecute(t *testing.T) {
 					ContainerHierarchyTexts: []string{"Auth Failure"},
 					State:                   "Passed",
 					RunTime:                 2.00,
+					SpecType:                "happyPath",
 					Failure: &IngestTestFailure{
 						Message: "Auth Failure",
 						Location: &IngestTestLocation{
@@ -627,6 +628,13 @@ func TestValidateE2EIngestInput(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "setup specType passes validation",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = "setup"
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range test {
 		t.Run(tt.name, func(t *testing.T) {
@@ -740,6 +748,7 @@ func TestListE2ERunsExecute(t *testing.T) {
 			Branch:      "main",
 			Status:      "passed",
 			Environment: "test",
+			SpecType:    "happyPath",
 			From:        &from,
 			To:          &to,
 			Page:        1,
@@ -809,6 +818,7 @@ func TestListE2ERunsExecute(t *testing.T) {
 		_, err := uc.Execute(context.Background(), ListE2ERunsInput{
 			ProjectID: "proj1",
 			Status:    "invalid",
+			SpecType:  "happyPath",
 		})
 		if err == nil {
 			t.Fatalf("expected error, got nil")
@@ -1147,6 +1157,7 @@ func TestGetE2EHeatmapExecute(t *testing.T) {
 		out, err := uc.Execute(context.Background(), E2EHeatmapInput{
 			Branch:         "main",
 			Status:         "failed",
+			SpecType:       "happyPath",
 			RunsPerProject: 10,
 		})
 		if err != nil {

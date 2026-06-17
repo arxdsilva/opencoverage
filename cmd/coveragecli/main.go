@@ -683,8 +683,10 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 							spec_type = "happyPath"
 						case strings.Contains(file, "negativePath"):
 							spec_type = "negativePath"
-						default:
+						case projectID == "happypath" || projectID == "negativePath" || projectID == "setup":
 							spec_type = projectID
+						default:
+							spec_type = "happyPath"
 						}
 					}
 				}
