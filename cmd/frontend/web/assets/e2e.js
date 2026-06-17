@@ -383,7 +383,7 @@ async function loadProjects() {
         e2eRunChain.innerHTML = '<p class="muted">No projects match current filters.</p>';
         e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No projects match current filters.</td></tr>';
       }
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
       e2eStatus.textContent = '-';
       e2eStatus.className = 'value';
       e2ePassRate.textContent = '-';
@@ -494,7 +494,7 @@ async function ensureSelectedProjectIsVisible() {
     e2eScreenProjectMeta.textContent = 'Adjust group and search filters to select a project.';
     e2eRunChain.innerHTML = '<p class="muted">No projects match current filters.</p>';
     e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No projects match current filters.</td></tr>';
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
     e2eStatus.textContent = '-';
     e2eStatus.className = 'value';
     e2ePassRate.textContent = '-';
@@ -569,7 +569,7 @@ async function loadE2EScreen(projectId, options = {}) {
   if (!projectId) {
     e2eRunChain.innerHTML = '<p class="muted">Select a project to view its run chain.</p>';
     e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">Select a project first.</td></tr>';
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
     return;
   }
 
@@ -665,7 +665,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
       e2eFailedSpecsCount.textContent = '-';
       e2eRunChain.innerHTML = '<p class="muted">No E2E runs found for current filters.</p>';
       e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No E2E runs found.</td></tr>';
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
       return;
     }
 
@@ -793,7 +793,7 @@ async function loadE2ERunDetails(projectId, runId) {
     const data = await res.json();
     const failedSpecs = data.failedSpecs || [];
     if (failedSpecs.length === 0) {
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No failed specs for this run.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No failed specs for this run.</td></tr>';
       return;
     }
 
