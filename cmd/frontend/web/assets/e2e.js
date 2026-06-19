@@ -12,6 +12,7 @@ const e2eBranchFilter = document.getElementById('e2eBranchFilter');
 const e2eStatusFilter = document.getElementById('e2eStatusFilter');
 const e2eEnvironmentFilter = document.getElementById('e2eEnvironmentFilter');
 const e2ePlatformFilter = document.getElementById('e2ePlatformFilter');
+const e2eSpecTypeFilter = document.getElementById('e2eSpecTypeFilter');
 const e2eReload = document.getElementById('e2eReload');
 const e2eAutoRefreshInterval = document.getElementById('e2eAutoRefreshInterval');
 const e2eAutoRefreshStatus = document.getElementById('e2eAutoRefreshStatus');
@@ -24,6 +25,7 @@ const closeE2EHeatmap = document.getElementById('closeE2EHeatmap');
 const e2eHeatmapOverlay = document.getElementById('e2eHeatmapOverlay');
 const heatmapBranchFilter = document.getElementById('heatmapBranchFilter');
 const heatmapStatusFilter = document.getElementById('heatmapStatusFilter');
+const heatmapSpecTypeFilter = document.getElementById('heatmapSpecTypeFilter');
 const heatmapReload = document.getElementById('heatmapReload');
 const e2eHeatmap = document.getElementById('e2eHeatmap');
 const appShell = document.getElementById('appShell');
@@ -82,6 +84,9 @@ e2eEnvironmentFilter.addEventListener('change', async () => {
 e2ePlatformFilter.addEventListener('change', async () => {
   await loadE2ERuns(selectedProjectId);
 });
+e2eSpecTypeFilter.addEventListener('change', async () => {
+  await loadE2ERuns(selectedProjectId);
+});
 e2eReload.addEventListener('click', async () => {
   await runWithButtonBusy(e2eReload, 'Reload', 'Reloading...', async () => {
     await loadE2EScreen(selectedProjectId, { preferredRunId: selectedE2ERunId });
@@ -99,6 +104,9 @@ heatmapBranchFilter.addEventListener('change', async () => {
   await loadHeatmap();
 });
 heatmapStatusFilter.addEventListener('change', async () => {
+  await loadHeatmap();
+});
+heatmapSpecTypeFilter.addEventListener('change', async () => {
   await loadHeatmap();
 });
 heatmapReload.addEventListener('click', async () => {
@@ -375,7 +383,7 @@ async function loadProjects() {
         e2eRunChain.innerHTML = '<p class="muted">No projects match current filters.</p>';
         e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No projects match current filters.</td></tr>';
       }
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
       e2eStatus.textContent = '-';
       e2eStatus.className = 'value';
       e2ePassRate.textContent = '-';
@@ -486,7 +494,7 @@ async function ensureSelectedProjectIsVisible() {
     e2eScreenProjectMeta.textContent = 'Adjust group and search filters to select a project.';
     e2eRunChain.innerHTML = '<p class="muted">No projects match current filters.</p>';
     e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No projects match current filters.</td></tr>';
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
     e2eStatus.textContent = '-';
     e2eStatus.className = 'value';
     e2ePassRate.textContent = '-';
@@ -561,7 +569,7 @@ async function loadE2EScreen(projectId, options = {}) {
   if (!projectId) {
     e2eRunChain.innerHTML = '<p class="muted">Select a project to view its run chain.</p>';
     e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">Select a project first.</td></tr>';
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
     return;
   }
 
@@ -610,6 +618,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     const selectedStatus = e2eStatusFilter.value || '';
     const selectedEnvironment = e2eEnvironmentFilter.value || '';
     const selectedPlatform = e2ePlatformFilter.value || '';
+    const selectedSpecType = e2eSpecTypeFilter.value || '';
     url.searchParams.set('branch', selectedBranch);
     if (selectedStatus) {
       url.searchParams.set('status', selectedStatus);
@@ -619,6 +628,9 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     }
     if (selectedPlatform) {
       url.searchParams.set('platform', selectedPlatform);
+    }
+    if (selectedSpecType) {
+      url.searchParams.set('specType', selectedSpecType);
     }
 
     const res = await fetch(url.toString());
@@ -632,7 +644,8 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     const currentStatus = e2eStatusFilter.value || '';
     const currentEnvironment = e2eEnvironmentFilter.value || '';
     const currentPlatform = e2ePlatformFilter.value || '';
-    if (currentBranch !== selectedBranch || currentStatus !== selectedStatus || currentEnvironment !== selectedEnvironment || currentPlatform !== selectedPlatform) return;
+    const currentSpecType = e2eSpecTypeFilter.value || '';
+    if (currentBranch !== selectedBranch || currentStatus !== selectedStatus || currentEnvironment !== selectedEnvironment || currentPlatform !== selectedPlatform || currentSpecType !== selectedSpecType) return;
 
     currentE2ERunItems = items;
     const passedRuns = items.filter((run) => run.status === 'passed').length;
@@ -640,9 +653,9 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     if (passedRuns === 0 && failedRuns === 0) {
       e2ePassRate.textContent = '-';
     } else if (failedRuns === 0) {
-      e2ePassRate.textContent = '∞%';
+      e2ePassRate.textContent = '100%';
     } else {
-      e2ePassRate.textContent = `${((passedRuns / failedRuns) * 100).toFixed(2)}%`;
+      e2ePassRate.textContent = `${((passedRuns / (passedRuns + failedRuns)) * 100).toFixed(2)}%`;
     }
 
     if (items.length === 0) {
@@ -652,7 +665,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
       e2eFailedSpecsCount.textContent = '-';
       e2eRunChain.innerHTML = '<p class="muted">No E2E runs found for current filters.</p>';
       e2eRunsBody.innerHTML = '<tr><td colspan="10" class="muted">No E2E runs found.</td></tr>';
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No run selected.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No run selected.</td></tr>';
       return;
     }
 
@@ -698,7 +711,7 @@ async function loadE2ERuns(projectId, preferredRunId = null) {
     selectedE2ERunId = null;
     e2eRunChain.innerHTML = `<p class="muted">${err.message}</p>`;
     e2eRunsBody.innerHTML = `<tr><td colspan="10" class="muted">${err.message}</td></tr>`;
-    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">Failed to load selected run details.</td></tr>';
+    e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">Failed to load selected run details.</td></tr>';
     e2ePassRate.textContent = '-';
   }
 }
@@ -779,16 +792,16 @@ async function loadE2ERunDetails(projectId, runId) {
     if (!res.ok) throw new Error(`failed to load E2E run details (${res.status})`);
     const data = await res.json();
     const failedSpecs = data.failedSpecs || [];
-
     if (failedSpecs.length === 0) {
-      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="4" class="muted">No failed specs for this run.</td></tr>';
+      e2eFailedSpecsBody.innerHTML = '<tr><td colspan="5" class="muted">No failed specs for this run.</td></tr>';
       return;
     }
 
-    for (const failed of failedSpecs) {
+     for (const failed of failedSpecs) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="code">${escapeHtml(failed.specPath || '-')}</td>
+        <td>${escapeHtml(failed.specType || '-')}</td>
         <td>${escapeHtml(failed.failureMessage || '-')}</td>
         <td class="code">${escapeHtml(failed.file || '-')}</td>
         <td>${failed.line || '-'}</td>
@@ -796,7 +809,7 @@ async function loadE2ERunDetails(projectId, runId) {
       e2eFailedSpecsBody.appendChild(tr);
     }
   } catch (err) {
-    e2eFailedSpecsBody.innerHTML = `<tr><td colspan="4" class="muted">${err.message}</td></tr>`;
+    e2eFailedSpecsBody.innerHTML = `<tr><td colspan="5" class="muted">${err.message}</td></tr>`;
   }
 }
 
@@ -844,6 +857,7 @@ async function loadHeatmap() {
     url.searchParams.set('runsPerProject', '10');
     if (heatmapBranchFilter.value) url.searchParams.set('branch', heatmapBranchFilter.value);
     if (heatmapStatusFilter.value) url.searchParams.set('status', heatmapStatusFilter.value);
+    if (heatmapSpecTypeFilter.value) url.searchParams.set('specType', heatmapSpecTypeFilter.value);
 
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error(`heatmap request failed (${res.status})`);

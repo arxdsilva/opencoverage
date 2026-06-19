@@ -106,6 +106,11 @@
               <option value="android">android</option>
               <option value="ios">ios</option>
             </select>
+            <select id="e2eSpecTypeFilter" class="branch-select">
+              <option value="">All spec types</option>
+              <option value="happyPath">happyPath</option>
+              <option value="negativePath">negativePath</option>
+            </select>
             <button id="e2eReload" class="btn">Reload</button>
           </div>
 
@@ -152,6 +157,7 @@
                   <thead>
                     <tr>
                       <th>Spec Path</th>
+                      <th>Spec Type</th>
                       <th>Message</th>
                       <th>File</th>
                       <th>Line</th>
@@ -180,6 +186,11 @@
                       <option value="">All statuses</option>
                       <option value="passed">passed</option>
                       <option value="failed">failed</option>
+                    </select>
+                    <select id="heatmapSpecTypeFilter" class="branch-select">
+                      <option value="">All spec types</option>
+                      <option value="happyPath">happyPath</option>
+                      <option value="negativePath">negativePath</option>
                     </select>
                     <button id="heatmapReload" class="btn">Reload</button>
                     <button id="closeE2EHeatmap" class="btn">Close</button>

@@ -81,6 +81,7 @@ func TestIngestE2ERunUseCaseExecute(t *testing.T) {
 					ContainerHierarchyTexts: []string{"Auth Failure"},
 					State:                   "Passed",
 					RunTime:                 2.00,
+					SpecType:                "happyPath",
 					Failure: &IngestTestFailure{
 						Message: "Auth Failure",
 						Location: &IngestTestLocation{
@@ -491,6 +492,26 @@ func TestIngestE2ERunBuildE2EEntities(t *testing.T) {
 			t.Fatalf("expected spec run ID %s, got %s", run.ID, specs[0].E2ETestRunID)
 		}
 	})
+
+	t.Run("Build entities with explicit specType", func(t *testing.T) {
+		uc := NewIngestE2ERunUseCase(nil, nil, nil, nil, &stubIDGenerator{}, &stubClock{})
+		input := runInput
+		input.TestReport.SpecReports = []IngestSpecReport{
+			{
+				LeafNodeText: "Error handling",
+				State:        "Passed",
+				SpecType:     "negativePath",
+				RunTime:      1.0,
+			},
+		}
+		_, specs := uc.buildE2EEntities("project-id", input, time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
+		if len(specs) != 1 {
+			t.Fatalf("expected 1 spec, got %d", len(specs))
+		}
+		if specs[0].SpecType != "negativePath" {
+			t.Fatalf("expected spec type negativePath, got %s", specs[0].SpecType)
+		}
+	})
 }
 
 func TestValidateE2EIngestInput(t *testing.T) {
@@ -577,6 +598,42 @@ func TestValidateE2EIngestInput(t *testing.T) {
 			},
 			wantErr:   true,
 			wantField: "testReport.specReports[0].failure.message",
+		},
+		{
+			name: "invalid specType returns error",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = "invalid"
+			},
+			wantErr:   true,
+			wantField: "testReport.specReports[0].specType",
+		},
+		{
+			name: "happyPath specType passes validation",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = "happyPath"
+			},
+			wantErr: false,
+		},
+		{
+			name: "negativePath specType passes validation",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = "negativePath"
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty specType passes validation",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "setup specType passes validation",
+			mutate: func(in *IngestE2ERunInput) {
+				in.TestReport.SpecReports[0].SpecType = "setup"
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range test {
@@ -691,6 +748,7 @@ func TestListE2ERunsExecute(t *testing.T) {
 			Branch:      "main",
 			Status:      "passed",
 			Environment: "test",
+			SpecType:    "happyPath",
 			From:        &from,
 			To:          &to,
 			Page:        1,
@@ -760,6 +818,7 @@ func TestListE2ERunsExecute(t *testing.T) {
 		_, err := uc.Execute(context.Background(), ListE2ERunsInput{
 			ProjectID: "proj1",
 			Status:    "invalid",
+			SpecType:  "happyPath",
 		})
 		if err == nil {
 			t.Fatalf("expected error, got nil")
@@ -796,6 +855,28 @@ func TestListE2ERunsExecute(t *testing.T) {
 		field, _ := appErr.Details["field"].(string)
 		if field != "environment" {
 			t.Fatalf("expected field environment, got %s", field)
+		}
+	})
+	t.Run("Returns an error when specType is invalid", func(t *testing.T) {
+		runRepo := &stubE2ETestRunRepository{}
+		uc := NewListE2ERunsUseCase(runRepo)
+		_, err := uc.Execute(context.Background(), ListE2ERunsInput{
+			ProjectID: "proj1",
+			SpecType:  "invalid",
+		})
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+		var appErr *AppError
+		if !errors.As(err, &appErr) {
+			t.Fatalf("expected AppError, got %T", err)
+		}
+		if appErr.Code != CodeInvalidArgument {
+			t.Fatalf("expected code to be INVALID_ARGUMENT, got %s", appErr.Code)
+		}
+		field, _ := appErr.Details["field"].(string)
+		if field != "specType" {
+			t.Fatalf("expected field specType, got %s", field)
 		}
 	})
 	t.Run("Returns an error when fails to list the runs", func(t *testing.T) {
@@ -1076,6 +1157,7 @@ func TestGetE2EHeatmapExecute(t *testing.T) {
 		out, err := uc.Execute(context.Background(), E2EHeatmapInput{
 			Branch:         "main",
 			Status:         "failed",
+			SpecType:       "happyPath",
 			RunsPerProject: 10,
 		})
 		if err != nil {

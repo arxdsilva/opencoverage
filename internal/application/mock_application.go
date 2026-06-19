@@ -73,7 +73,7 @@ func (s *stubE2ETestRunRepository) GetByID(ctx context.Context, projectID string
 	return *s.byID, nil
 }
 
-func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error) {
+func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID string, branch string, status string, environment string, specType string, from *time.Time, to *time.Time, page int, pageSize int) ([]domain.E2ETestRun, int, error) {
 	s.capturedBranch = branch
 	s.capturedStatus = status
 	if s.listErr != nil {
@@ -82,7 +82,7 @@ func (s *stubE2ETestRunRepository) ListByProject(ctx context.Context, projectID 
 	return s.listed, s.listTotal, nil
 }
 
-func (s *stubE2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, runsPerProject int) ([]TestHeatmapRow, error) {
+func (s *stubE2ETestRunRepository) HeatmapData(ctx context.Context, branch string, status string, specType string, runsPerProject int) ([]TestHeatmapRow, error) {
 	s.capturedBranch = branch
 	s.capturedStatus = status
 	if s.heatmapErr != nil {

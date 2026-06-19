@@ -630,6 +630,8 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 
 				// Use the last test result (accounts for retries).
 				tests := firstSlice(specMap, "tests")
+				file := firstString(suiteMap, "file")
+				spec_type := "happyPath"
 				state := "skipped"
 				runTime := 0.0
 				var failureBlock map[string]any
@@ -668,6 +670,24 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 								}
 							}
 						}
+
+						// spec_type can be either setup, happyPath or negativePath
+						// checks if the file name contains "setup", "happyPath" or "negativePath" to determine the spec_type
+						// fall back to checking the projectId
+						projectID := firstString(testMap, "projectId")
+
+						switch {
+						case strings.Contains(file, "setup"):
+							spec_type = "setup"
+						case strings.Contains(file, "happyPath"):
+							spec_type = "happyPath"
+						case strings.Contains(file, "negativePath"):
+							spec_type = "negativePath"
+						case projectID == "happypath" || projectID == "negativePath" || projectID == "setup":
+							spec_type = projectID
+						default:
+							spec_type = "happyPath"
+						}
 					}
 				}
 
@@ -682,6 +702,8 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 					"containerHierarchyTexts": hierarchyCopy,
 					"state":                   state,
 					"runTime":                 runTime,
+					"suite_type":              firstString(suiteMap, "type"),
+					"specType":                spec_type,
 				}
 				if failureBlock != nil {
 					normalized["failure"] = failureBlock
