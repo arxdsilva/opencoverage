@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Appium Android Test Suite" tests="3" failures="1" errors="0" time="42.318">
+
+  <testsuite name="Tests" tests="3" failures="1" errors="0" skipped="0" time="42.318"
+             hostname="localhost">
+
+    <properties>
+      <property name="deviceName" value="Pixel"/>
+      <property name="platformName" value="Android"/>
+      <property name="automationName" value="UiAutomator2"/>
+    </properties>
+
+    <testcase classname="Tests" name="Test1" time="12.542">
+    </testcase>
+
+    <testcase classname="Tests" name="Test2" time="9.118">
+      <failure message="Assertion failed: Expected error message not displayed">
+      </failure>
+    </testcase>
+
+    <testcase classname="Tests" name="Test3" time="20.658">
+    </testcase>
+
+  </testsuite>
+</testsuites>
