@@ -544,9 +544,17 @@ func runE2EUpload(args []string) {
 		}
 		switch *reportType {
 		case "playwright":
-			normalizedReport = normalizePlaywrightJUnit(junitData)
+			var err error
+			normalizedReport, err = normalizePlaywrightJUnit(junitData)
+			if err != nil {
+				exitErr("normalize playwright junit", err)
+			}
 		case "appium":
-			normalizedReport = normalizeAppiumJUnit(junitData)
+			var err error
+			normalizedReport, err = normalizeAppiumJUnit(junitData)
+			if err != nil {
+				exitErr("normalize appium junit", err)
+			}
 		default:
 			exitErr("validate input", fmt.Errorf("unsupported report type: %s", *reportType))
 		}
@@ -797,14 +805,16 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 
 // normalizePlaywrightJUnit converts a Playwright JUnit XML report into the normalized map[string]any structure.
 // Playwright JUnit uses classname format: "file › Suite Title › Nested Suite"
-func normalizePlaywrightJUnit(data JUnitTestSuites) map[string]any {
-	fmt.Errorf("Playwright JUnit XML normalization is not yet implemented")
-	return nil
+func normalizePlaywrightJUnit(data JUnitTestSuites) (map[string]any, error) {
+	return nil, fmt.Errorf("Playwright JUnit XML normalization is not yet implemented")
 }
 
 // normalizeAppiumJUnit converts an Appium JUnit XML report into the normalized map[string]any structure.
 // Appium JUnit uses classname format: "com.package.ClassName" (dot-separated)
-func normalizeAppiumJUnit(data JUnitTestSuites) map[string]any {
+func normalizeAppiumJUnit(data JUnitTestSuites) (map[string]any, error) {
+	if len(data.TestSuites) == 0 {
+		return nil, fmt.Errorf("ERR_INPUT_SCHEMA: appium JUnit report contains no <testsuite> elements")
+	}
 	result := make(map[string]any)
 	testFramework := "appium"
 	result["reportType"] = &testFramework
@@ -813,6 +823,10 @@ func normalizeAppiumJUnit(data JUnitTestSuites) map[string]any {
 	// Use top-level testsuites name as suiteDescription
 	if data.Name != "" {
 		result["suiteDescription"] = data.Name
+	}
+
+	if len(data.TestSuites[0].TestCases) == 0 {
+		return nil, fmt.Errorf("ERR_INPUT_SCHEMA: appium JUnit report contains no <testcase> elements")
 	}
 	result["suitePath"] = data.TestSuites[0].TestCases[0].Classname
 	result["frameworkVersion"] = ""
@@ -901,7 +915,7 @@ func normalizeAppiumJUnit(data JUnitTestSuites) map[string]any {
 		}
 	}
 	result["specReports"] = specReports
-	return result
+	return result, nil
 }
 
 // stripANSI removes ANSI escape codes from a string.

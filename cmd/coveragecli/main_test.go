@@ -420,7 +420,10 @@ func TestNormalizeAppiumJUnit(t *testing.T) {
 		t.Fatalf("unmarshal xml: %v", err)
 	}
 
-	result := normalizeAppiumJUnit(data)
+	result, err := normalizeAppiumJUnit(data)
+	if err != nil {
+		t.Fatalf("normalizeAppiumJUnit: %v", err)
+	}
 
 	// Verify metadata
 	if rt, ok := result["reportType"].(*string); !ok || *rt != "appium" {
