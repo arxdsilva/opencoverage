@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"os"
 	"path/filepath"
 	"testing"
@@ -403,5 +404,96 @@ func TestStripANSI(t *testing.T) {
 				t.Fatalf("stripANSI(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNormalizeAppiumJUnit(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join("testdata", "appium-junit-report.xml"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	var data JUnitTestSuites
+	if err := xml.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("unmarshal xml: %v", err)
+	}
+
+	result, err := normalizeAppiumJUnit(data)
+	if err != nil {
+		t.Fatalf("normalizeAppiumJUnit: %v", err)
+	}
+
+	// Verify metadata
+	if rt, ok := result["reportType"].(*string); !ok || *rt != "appium" {
+		t.Fatalf("reportType = %v, want *appium", result["reportType"])
+	}
+	if result["suiteDescription"] != "Appium Android Test Suite" {
+		t.Fatalf("suiteDescription = %v, want 'Appium Android Test Suite'", result["suiteDescription"])
+	}
+	if result["platformType"] != "android" {
+		t.Fatalf("platformType = %v, want android", result["platformType"])
+	}
+	if result["frameworkVersion"] != "UiAutomator2" {
+		t.Fatalf("frameworkVersion = %v, want UiAutomator2", result["frameworkVersion"])
+	}
+
+	specs, ok := result["specReports"].([]map[string]any)
+	if !ok {
+		t.Fatalf("specReports is not []map[string]any")
+	}
+	if len(specs) != 3 {
+		t.Fatalf("specReports count = %d, want 3", len(specs))
+	}
+
+	tests := []struct {
+		name     string
+		state    string
+		specType string
+		time     float64
+	}{
+		{"Test1", "passed", "happyPath", 12.542},
+		{"Test2", "failed", "happyPath", 9.118},
+		{"Test3", "passed", "happyPath", 20.658},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := specs[i]
+			if spec["leafNodeText"] != tt.name {
+				t.Errorf("spec[%d] leafNodeText = %v, want %v", i, spec["leafNodeText"], tt.name)
+			}
+			if spec["state"] != tt.state {
+				t.Errorf("spec[%d] state = %v, want %v", i, spec["state"], tt.state)
+			}
+			if spec["specType"] != tt.specType {
+				t.Errorf("spec[%d] specType = %v, want %v", i, spec["specType"], tt.specType)
+			}
+			if spec["runTime"] != tt.time {
+				t.Errorf("spec[%d] runTime = %v, want %v", i, spec["runTime"], tt.time)
+			}
+			// Verify hierarchy
+			hier, ok := spec["containerHierarchyTexts"].([]any)
+			if !ok || len(hier) == 0 {
+				t.Errorf("spec[%d] containerHierarchyTexts empty", i)
+			}
+			if len(hier) > 0 && hier[0] != "Tests" {
+				t.Errorf("spec[%d] hierarchy[0] = %v, want Tests", i, hier[0])
+			}
+		})
+	}
+
+	// Verify failure block on the failed spec
+	failedSpec := specs[1]
+	failure, ok := failedSpec["failure"].(map[string]any)
+	if !ok {
+		t.Fatalf("failed spec has no failure block")
+	}
+	if failure["message"] != "Assertion failed: Expected error message not displayed" {
+		t.Errorf("failure message = %v", failure["message"])
+	}
+	if _, ok := failure["stackTrace"]; !ok {
+		t.Errorf("failure missing stackTrace")
 	}
 }

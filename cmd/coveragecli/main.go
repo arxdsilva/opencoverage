@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -112,6 +114,57 @@ type vitestSummaryEntry struct {
 type metricAgg struct {
 	Covered float64
 	Total   float64
+}
+
+// JUnit XML structs — shared between Playwright and Appium JUnit reports.
+// JUnitTestSuites represents the root <testsuites> element in JUnit XML.
+type JUnitTestSuites struct {
+	XMLName    xml.Name         `xml:"testsuites"`
+	Name       string           `xml:"name,attr,omitempty"`
+	Tests      int              `xml:"tests,attr,omitempty"`
+	Failures   int              `xml:"failures,attr,omitempty"`
+	Errors     int              `xml:"errors,attr,omitempty"`
+	Time       float64          `xml:"time,attr,omitempty"`
+	TestSuites []JUnitTestSuite `xml:"testsuite"`
+}
+
+// JUnitTestSuite represents a single <testsuite> element in JUnit XML.
+type JUnitTestSuite struct {
+	Name       string          `xml:"name,attr"`
+	Tests      int             `xml:"tests,attr,omitempty"`
+	Failures   int             `xml:"failures,attr,omitempty"`
+	Errors     int             `xml:"errors,attr,omitempty"`
+	Skipped    int             `xml:"skipped,attr,omitempty"`
+	Time       float64         `xml:"time,attr,omitempty"`
+	Timestamp  string          `xml:"timestamp,attr,omitempty"`
+	Hostname   string          `xml:"hostname,attr,omitempty"`
+	Properties []JUnitProperty `xml:"properties>property,omitempty"`
+	TestCases  []JUnitTestCase `xml:"testcase"`
+	SystemOut  string          `xml:"system-out,omitempty"`
+}
+
+type JUnitTestCase struct {
+	Classname string        `xml:"classname,attr,omitempty"`
+	Name      string        `xml:"name,attr"`
+	Time      float64       `xml:"time,attr,omitempty"`
+	Status    string        `xml:"status,attr,omitempty"`
+	Failure   *JUnitFailure `xml:"failure,omitempty"`
+	Skipped   *JUnitSkipped `xml:"skipped,omitempty"`
+}
+
+type JUnitFailure struct {
+	Message string `xml:"message,attr,omitempty"`
+	Type    string `xml:"type,attr,omitempty"`
+	Body    string `xml:",chardata"`
+}
+
+type JUnitSkipped struct {
+	Message string `xml:"message,attr,omitempty"`
+}
+
+type JUnitProperty struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
 }
 
 func main() {
@@ -437,7 +490,7 @@ func runE2EUpload(args []string) {
 	triggerType := fs.String("trigger-type", "manual", "Trigger type: push|pr|manual")
 	environment := fs.String("environment", "", "Environment: test|stage|prod (optional)")
 	runTimestamp := fs.String("run-timestamp", time.Now().UTC().Format(time.RFC3339), "Run timestamp (RFC3339)")
-	platformType := fs.String("platform-type", "web", "Platform type: web|android|ios")
+	
 	if err := fs.Parse(args); err != nil {
 		exitErr("parse flags", err)
 	}
@@ -457,9 +510,16 @@ func runE2EUpload(args []string) {
 		exitErr("read e2e report", err)
 	}
 
-	var report map[string]any
-	if err := json.Unmarshal(rawReport, &report); err != nil {
-		exitErr("parse e2e report json", err)
+	// Detect file format from extension
+	ext := strings.ToLower(filepath.Ext(*reportPath))
+	var isXML bool
+	switch ext {
+	case ".xml":
+		isXML = true
+	case ".json":
+		isXML = false
+	default:
+		exitErr("validate input", fmt.Errorf("unsupported file extension %q: expected .json or .xml", ext))
 	}
 
 	var group *string
@@ -475,17 +535,43 @@ func runE2EUpload(args []string) {
 		env = environment
 	}
 
-	// Normalize report structure based on report type
-	var normalizeReport map[string]any
-	switch *reportType {
-	case "playwright":
-		normalizeReport = normalizePlaywrightReport(report)
-	case "appium":
-		normalizeReport = normalizeAppiumReport(report)
-	default:
-		exitErr("validate input", fmt.Errorf("unsupported report type: %s", *reportType))
+	// Normalize report structure based on report type and file format
+	var normalizedReport map[string]any
+	if isXML {
+		var junitData JUnitTestSuites
+		if err := xml.Unmarshal(rawReport, &junitData); err != nil {
+			exitErr("parse e2e report xml", err)
+		}
+		switch *reportType {
+		case "playwright":
+			var err error
+			normalizedReport, err = normalizePlaywrightJUnit(junitData)
+			if err != nil {
+				exitErr("normalize playwright junit", err)
+			}
+		case "appium":
+			var err error
+			normalizedReport, err = normalizeAppiumJUnit(junitData)
+			if err != nil {
+				exitErr("normalize appium junit", err)
+			}
+		default:
+			exitErr("validate input", fmt.Errorf("unsupported report type: %s", *reportType))
+		}
+	} else {
+		var report map[string]any
+		if err := json.Unmarshal(rawReport, &report); err != nil {
+			exitErr("parse e2e report json", err)
+		}
+		switch *reportType {
+		case "playwright":
+			normalizedReport = normalizePlaywrightReport(report)
+		case "appium":
+			exitErr("validate input", fmt.Errorf("appium JSON report format is not yet supported; use JUnit XML (.xml)"))
+		default:
+			exitErr("validate input", fmt.Errorf("unsupported report type: %s", *reportType))
+		}
 	}
-	normalizeReport["platformType"] = *platformType
 
 	payload := e2ePayload{
 		ProjectKey:    *projectKey,
@@ -498,7 +584,7 @@ func runE2EUpload(args []string) {
 		TriggerType:   *triggerType,
 		RunTimestamp:  *runTimestamp,
 		Environment:   env,
-		TestReport:    normalizeReport,
+		TestReport:    normalizedReport,
 	}
 
 	body, err := json.MarshalIndent(payload, "", "  ")
@@ -717,10 +803,119 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 	return result
 }
 
-func normalizeAppiumReport(raw map[string]any) map[string]any {
-	// not implemented yet
-	exitErr("normalize report", fmt.Errorf("appium report normalization not implemented yet"))
-	return nil
+// normalizePlaywrightJUnit converts a Playwright JUnit XML report into the normalized map[string]any structure.
+// Playwright JUnit uses classname format: "file › Suite Title › Nested Suite"
+func normalizePlaywrightJUnit(data JUnitTestSuites) (map[string]any, error) {
+	return nil, fmt.Errorf("Playwright JUnit XML normalization is not yet implemented")
+}
+
+// normalizeAppiumJUnit converts an Appium JUnit XML report into the normalized map[string]any structure.
+// Appium JUnit uses classname format: "com.package.ClassName" (dot-separated)
+func normalizeAppiumJUnit(data JUnitTestSuites) (map[string]any, error) {
+	if len(data.TestSuites) == 0 {
+		return nil, fmt.Errorf("ERR_INPUT_SCHEMA: appium JUnit report contains no <testsuite> elements")
+	}
+	result := make(map[string]any)
+	testFramework := "appium"
+	result["reportType"] = &testFramework
+	result["testFramework"] = &testFramework
+
+	// Use top-level testsuites name as suiteDescription
+	if data.Name != "" {
+		result["suiteDescription"] = data.Name
+	}
+
+	if len(data.TestSuites[0].TestCases) == 0 {
+		return nil, fmt.Errorf("ERR_INPUT_SCHEMA: appium JUnit report contains no <testcase> elements")
+	}
+	result["suitePath"] = data.TestSuites[0].TestCases[0].Classname
+	result["frameworkVersion"] = ""
+
+	// Extract platform metadata from first testsuite's properties
+	// Set default platform type for Appium
+	platformType := "android"
+	if len(data.TestSuites) > 0 {
+		for _, prop := range data.TestSuites[0].Properties {
+			switch prop.Name {
+			case "platformName":
+				platformType = strings.ToLower(prop.Value)
+			case "automationName":
+				result["frameworkVersion"] = prop.Value
+			}
+		}
+	}
+	result["platformType"] = platformType
+	fmt.Println("normalize: ", result["platformType"])
+
+	var specReports []map[string]any
+	for _, suite := range data.TestSuites {
+		for _, tc := range suite.TestCases {
+			// Appium classname format: "com.package.tests.Login.LoginPass" (split on ".")
+			var hierarchy []any
+			if tc.Classname != "" {
+				parts := strings.Split(tc.Classname, ".")
+				for _, p := range parts {
+					if p != "" {
+						hierarchy = append(hierarchy, p)
+					}
+				}
+			}
+
+			// Determine state from failure/skipped elements or status attribute
+			state := "passed"
+			if tc.Failure != nil {
+				state = "failed"
+			} else if tc.Skipped != nil {
+				state = "skipped"
+			} else if tc.Status != "" {
+				// Some Appium/TestNG reporters include a status attribute
+				switch strings.ToLower(tc.Status) {
+				case "passed":
+					state = "passed"
+				case "failed":
+					state = "failed"
+				case "skipped":
+					state = "skipped"
+				}
+			}
+
+			// Determine specType from classname keywords
+			specType := "happyPath"
+			classLower := strings.ToLower(tc.Classname)
+			switch {
+			case strings.Contains(classLower, "setup"):
+				specType = "setup"
+			case strings.Contains(classLower, "happyPath"):
+				specType = "happyPath"
+			case strings.Contains(classLower, "negativepath"):
+				specType = "negativePath"
+			default:
+				specType = "happyPath"
+			}
+
+			spec := map[string]any{
+				"leafNodeText":            tc.Name,
+				"containerHierarchyTexts": hierarchy,
+				"state":                   state,
+				"runTime":                 tc.Time,
+				"suite_type":              suite.Name,
+				"specType":                specType,
+			}
+
+			if tc.Failure != nil {
+				failure := map[string]any{
+					"message": tc.Failure.Message,
+				}
+				if tc.Failure.Body != "" {
+					failure["stackTrace"] = strings.TrimSpace(tc.Failure.Body)
+				}
+				spec["failure"] = failure
+			}
+			specReports = append(specReports, spec)
+		}
+	}
+	result["specReports"] = specReports
+	return result, nil
 }
 
 // stripANSI removes ANSI escape codes from a string.
